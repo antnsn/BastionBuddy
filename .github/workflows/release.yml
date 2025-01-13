@@ -3,28 +3,23 @@ name: Release BastionBuddy
 on:
   push:
     tags:
-      - 'v*' # Trigger on version tags
-
-permissions:
-  contents: write # Needed for creating releases
+      - 'v*'
 
 jobs:
-  build-and-release:
+  release:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Needed for version determination
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
-          cache: true
-      
-      - name: Get version from tag
+
+      - name: Get version
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
@@ -76,17 +71,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Trigger Homebrew update
-        if: success()
-        run: |
-          # Wait a few seconds for the release to be fully published
-          sleep 5
-          
-          # Trigger repository_dispatch event on homebrew-bastionbuddy
-          curl -L \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.HOMEBREW_TAP_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/antnsn/homebrew-bastionbuddy/dispatches \
-            -d '{"event_type":"release_published","client_payload":{"version":"${{ env.VERSION }}"}}'
+      - name: Notify Homebrew Tap
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          repository: antnsn/homebrew-bastionbuddy
+          event-type: update_formula
+          client-payload: '{"version": "${{ env.VERSION }}", "ref": "${{ github.sha }}"}'
