@@ -71,8 +71,8 @@ jobs:
           name: Release ${{ env.VERSION }}
           body: ${{ steps.changelog.outputs.CHANGELOG }}
           files: |
-            builds/*.tar.gz
-            builds/*.zip
+            builds/bastionbuddy_*.tar.gz
+            builds/bastionbuddy_*.zip
           draft: false
           prerelease: false
         env:
