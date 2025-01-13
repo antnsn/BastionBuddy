@@ -35,6 +35,16 @@ That's it! All other dependencies are bundled with the application.
    sudo mv bastionBuddy /usr/local/bin/
    ```
 
+## Homebrew   
+
+### Add the tap
+```bash
+brew tap antnsn/bastionbuddy
+```
+### Install BastionBuddy
+```bash
+brew install bastionbuddy
+```
 ## Usage
 
 Simply run:
