@@ -21,24 +21,22 @@ jobs:
           go-version: '1.21'
           cache: true
 
-      - name: Install golangci-lint
+      - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
           args: --timeout=5m
 
-      - name: Run linting
-        run: |
-          export PATH="/home/runner/golangci-lint-1.63.4-linux-amd64:$PATH"
-          make lint
+      - name: Run make lint
+        run: make lint
 
-      - name: Run tests
+      - name: Run make test
         run: make test
 
-      - name: Build
+      - name: Run make build
         run: make build
 
-      - name: Test build for all platforms
+      - name: Run make all
         run: make all
 
       - name: Upload build artifacts

@@ -32,12 +32,15 @@ test:
 	go test -v ./...
 
 lint:
-	@if ! command -v golangci-lint &> /dev/null; then \
+	@if [ -f "/home/runner/golangci-lint-1.63.4-linux-amd64/golangci-lint" ]; then \
+		/home/runner/golangci-lint-1.63.4-linux-amd64/golangci-lint run; \
+	elif command -v golangci-lint &> /dev/null; then \
+		golangci-lint run; \
+	else \
 		echo "golangci-lint not found. Run ./scripts/check.sh to install it."; \
 		exit 1; \
 	fi
 	go mod tidy
-	golangci-lint run
 
 install: build
 	cp $(BUILD_DIR)/$(BINARY_NAME) $(GOPATH)/bin/
