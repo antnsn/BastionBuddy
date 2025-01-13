@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -18,6 +21,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
+          cache: true
 
       - name: Get version
         id: get_version
@@ -65,7 +69,6 @@ jobs:
           body: ${{ steps.changelog.outputs.CHANGELOG }}
           files: |
             builds/*.tar.gz
-            builds/*.zip
           draft: false
           prerelease: false
         env:
