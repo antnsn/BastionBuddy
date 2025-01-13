@@ -28,7 +28,9 @@ jobs:
           args: --timeout=5m
 
       - name: Run linting
-        run: make lint
+        run: |
+          export PATH="/home/runner/golangci-lint-1.63.4-linux-amd64:$PATH"
+          make lint
 
       - name: Run tests
         run: make test
