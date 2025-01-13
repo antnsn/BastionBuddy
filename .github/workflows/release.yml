@@ -38,6 +38,9 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
 
+      - name: List build artifacts
+        run: ls -la builds/
+
       - name: Generate changelog
         id: changelog
         shell: bash
@@ -74,6 +77,9 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup build directories
+        run: make cleanup
 
       - name: Notify Homebrew Tap
         uses: peter-evans/repository-dispatch@v2
