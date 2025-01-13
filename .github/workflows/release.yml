@@ -69,6 +69,7 @@ jobs:
           body: ${{ steps.changelog.outputs.CHANGELOG }}
           files: |
             builds/*.tar.gz
+            builds/*.zip
           draft: false
           prerelease: false
         env:
