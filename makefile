@@ -1,4 +1,4 @@
-.PHONY: build clean test lint all
+.PHONY: build clean test lint all release
 
 BINARY_NAME=bastionBuddy
 BUILD_DIR=builds
@@ -32,6 +32,11 @@ test:
 	go test -v ./...
 
 lint:
+	@if ! command -v golangci-lint &> /dev/null; then \
+		echo "golangci-lint not found. Run ./scripts/check.sh to install it."; \
+		exit 1; \
+	fi
+	go mod tidy
 	golangci-lint run
 
 install: build

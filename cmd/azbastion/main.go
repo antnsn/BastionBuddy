@@ -1,3 +1,6 @@
+// Package main provides the entry point for the BastionBuddy CLI tool,
+// which facilitates SSH connections and tunneling to Azure virtual machines
+// through Azure Bastion.
 package main
 
 import (
@@ -5,55 +8,47 @@ import (
 	"os"
 
 	"github.com/antnsn/BastionBuddy/internal/azure"
-	"github.com/antnsn/BastionBuddy/internal/config"
+	"github.com/antnsn/BastionBuddy/internal/welcome"
 	"github.com/spf13/cobra"
 )
 
 func main() {
-	cfg := config.NewConfig()
-	
 	rootCmd := &cobra.Command{
-		Use:   "azbastion",
+		Use:   "bastionbuddy",
 		Short: "Azure Bastion Connection Utility",
-		Long: `A unified tool for managing Azure Bastion connections with support for SSH, RDP, and Tunneling.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Long:  "A utility for managing connections to Azure VMs through Azure Bastion",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			welcome.ShowWelcome()
+
 			if err := azure.CheckDependencies(); err != nil {
-				return err
+				return fmt.Errorf("dependency check failed: %v", err)
 			}
-
-			defer azure.Cleanup()
-
-			if cfg.ConnectionType == "" {
-				connType, err := azure.SelectConnectionType()
-				if err != nil {
-					return err
+			defer func() {
+				if err := azure.Cleanup(); err != nil {
+					fmt.Fprintf(os.Stderr, "Error during cleanup: %v\n", err)
 				}
-				cfg.ConnectionType = connType
-			}
+			}()
 
-			azureConfig, err := azure.GetAzureResources()
+			config, err := azure.GetAzureResources()
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get Azure resources: %v", err)
 			}
 
-			// Merge CLI config with Azure config
-			azureConfig.Username = cfg.Username
-			azureConfig.LocalPort = cfg.LocalPort
-			azureConfig.RemotePort = cfg.RemotePort
+			connectionType, err := azure.SelectConnectionType()
+			if err != nil {
+				return fmt.Errorf("failed to select connection type: %v", err)
+			}
 
-			return azure.Connect(cfg.ConnectionType, azureConfig)
+			if err := azure.Connect(connectionType, config); err != nil {
+				return fmt.Errorf("failed to establish connection: %v", err)
+			}
+
+			return nil
 		},
 	}
 
-	// Add flags
-	flags := rootCmd.Flags()
-	flags.StringVarP(&cfg.ConnectionType, "type", "t", "", "Connection type (ssh|rdp|tunnel)")
-	flags.StringVarP(&cfg.Username, "username", "u", "", "Username for SSH connection")
-	flags.IntVarP(&cfg.LocalPort, "local-port", "l", 0, "Local port for tunnel connection")
-	flags.IntVarP(&cfg.RemotePort, "remote-port", "r", 0, "Remote port for tunnel connection")
-
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }

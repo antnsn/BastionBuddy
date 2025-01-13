@@ -1,3 +1,5 @@
+// Package welcome provides functionality for displaying the welcome screen
+// and initial application information to users.
 package welcome
 
 import (
@@ -7,74 +9,78 @@ import (
 	"github.com/fatih/color"
 )
 
-const logo = `    ____             __  _             ____            __    __     
-   / __ )____ ______/ /_(_)___  ____  / __ )__  ______/ /___/ /_  __
-  / __  / __ '/ ___/ __/ / __ \/ __ \/ __  / / / / __  / __  / / / /
- / /_/ / /_/ (__  ) /_/ / /_/ / / / / /_/ / /_/ / /_/ / /_/ / /_/ / 
-/_____/\__,_/____/\__/_/\____/_/ /_/_____/\__,_/\__,_/\__,_/\__, /  
-                                                           /____/   `
+var (
+	cyan    = color.New(color.FgCyan)
+	magenta = color.New(color.FgMagenta)
+	yellow  = color.New(color.FgYellow)
+)
 
+// ShowWelcome displays the welcome screen with the application logo,
+// version information, and usage tips.
 func ShowWelcome() {
-	// Clear the screen first
-	fmt.Print("\033[H\033[2J")
+	logo := `
+ ██████╗  █████╗ ███████╗████████╗██╗ ██████╗ ███╗   ██╗██████╗ ██╗   ██╗██████╗ ██████╗ ██╗   ██╗
+ ██╔══██╗██╔══██╗██╔════╝╚══██╔══╝██║██╔═══██╗████╗  ██║██╔══██╗██║   ██║██╔══██╗██╔══██╗╚██╗ ██╔╝
+ ██████╔╝███████║███████╗   ██║   ██║██║   ██║██╔██╗ ██║██████╔╝██║   ██║██║  ██║██║  ██║ ╚████╔╝
+ ██╔══██╗██╔══██║╚════██║   ██║   ██║██║   ██║██║╚██╗██║██╔══██╗██║   ██║██║  ██║██║  ██║  ╚██╔╝
+ ██████╔╝██║  ██║███████║   ██║   ██║╚██████╔╝██║ ╚████║██████╔╝╚██████╔╝██████╔╝██████╔╝   ██║
+ ╚═════╝ ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═════╝  ╚═════╝ ╚═════╝ ╚═════╝    ╚═╝
+`
+	if _, err := cyan.Println(logo); err != nil {
+		fmt.Println(logo) // Fallback to regular print if colored fails
+	}
 
-	// Print the logo in bright cyan
-	cyan := color.New(color.FgHiCyan, color.Bold)
-	cyan.Println(logo)
-
-	// Print version and description
-	magenta := color.New(color.FgHiMagenta)
-	magenta.Print("Version: ")
+	if _, err := magenta.Print("Version: "); err != nil {
+		fmt.Print("Version: ")
+	}
 	fmt.Println("1.0.0")
-	magenta.Print("Description: ")
-	fmt.Println("A friendly Azure Bastion connection utility")
-	fmt.Println()
 
-	// Print features
-	yellow := color.New(color.FgYellow, color.Bold)
-	yellow.Println("✨ Features:")
-	features := []string{
-		"🔒 Secure SSH connections to Azure VMs",
-		"🌐 Port tunneling for remote access",
-		"⚡ Smart caching for faster resource listing",
-		"🎯 Interactive menu navigation",
+	if _, err := magenta.Print("Description: "); err != nil {
+		fmt.Print("Description: ")
 	}
-	for _, feature := range features {
-		fmt.Printf("   %s\n", feature)
-	}
-	fmt.Println()
+	fmt.Println("A friendly command-line utility that makes Azure Bastion connections easy and interactive.")
 
-	// Print usage tips
-	yellow.Println("🚀 Usage Tips:")
-	tips := []string{
-		"↑/↓  Navigate through options",
-		"⌨️   Type to search in lists",
-		"↵    Press Enter to select",
-		"^C   Press Ctrl+C to exit",
-	}
-	for _, tip := range tips {
-		fmt.Printf("   %s\n", tip)
-	}
 	fmt.Println()
+	if _, err := yellow.Println("✨ Features:"); err != nil {
+		fmt.Println("✨ Features:")
+	}
+	fmt.Println("• Interactive menu-driven interface")
+	fmt.Println("• Support for both SSH and Port Tunneling")
+	fmt.Println("• Automatic Azure resource discovery")
+	fmt.Println("• Smart caching for faster subsequent connections")
+	fmt.Println("• Colorful and intuitive UI")
 
-	// Print separator with gradient effect
+	fmt.Println()
+	if _, err := yellow.Println("🚀 Usage Tips:"); err != nil {
+		fmt.Println("🚀 Usage Tips:")
+	}
+	fmt.Println("• Use arrow keys to navigate")
+	fmt.Println("• Type to search in lists")
+	fmt.Println("• Press Enter to select")
+	fmt.Println("• Use Ctrl+C to exit at any time")
+
+	printSeparator()
+}
+
+func printSeparator() {
+	separator := strings.Repeat("=", 80)
 	colors := []*color.Color{
-		color.New(color.FgHiBlue),
-		color.New(color.FgHiCyan),
-		color.New(color.FgHiMagenta),
+		color.New(color.FgBlue),
+		color.New(color.FgMagenta),
+		color.New(color.FgCyan),
 	}
-	
-	separator := strings.Repeat("─", 60)
-	parts := len(colors)
-	partLength := len(separator) / parts
-	
+
+	partLength := len(separator) / len(colors)
+
 	for i, c := range colors {
 		start := i * partLength
 		end := start + partLength
 		if i == len(colors)-1 {
 			end = len(separator)
 		}
-		c.Print(separator[start:end])
+		if _, err := c.Print(separator[start:end]); err != nil {
+			fmt.Print(separator[start:end]) // Fallback to regular print if colored fails
+		}
 	}
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 }

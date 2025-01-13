@@ -1,23 +1,12 @@
+// Package azure provides functionality for interacting with Azure resources
+// through the Azure CLI, specifically for Bastion connections.
 package azure
 
-// Resource represents an Azure resource
-type Resource struct {
-	Name string `json:"name"`
-	ID   string `json:"id"`
-}
-
-// BastionHost represents an Azure Bastion host
-type BastionHost struct {
-	Name          string `json:"name"`
-	ResourceGroup string `json:"resourceGroup"`
-}
-
-// AzureConfig holds the configuration for Azure resources
-type AzureConfig struct {
-	ResourceID            string
-	BastionName          string
-	BastionResourceGroup string
-	Username             string
-	LocalPort            int
-	RemotePort           int
+// ResourceConfig contains all the necessary configuration for connecting to an Azure resource.
+type ResourceConfig struct {
+	BastionHost    *BastionHost
+	TargetResource *TargetResource
+	Username       string
+	LocalPort      int
+	RemotePort     int
 }

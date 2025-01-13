@@ -1,0 +1,23 @@
+linters:
+  enable:
+    - gofmt
+    - revive      # Modern replacement for golint
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - ineffassign
+
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  exclude-dirs:
+    - vendor
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  formats: colored-line-number  # Simple format specification
