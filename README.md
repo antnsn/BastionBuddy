@@ -1,4 +1,10 @@
-# BastionBuddy
+ ██████╗  █████╗ ███████╗████████╗██╗ ██████╗ ███╗   ██╗██████╗ ██╗   ██╗██████╗ ██████╗ ██╗   ██╗
+ ██╔══██╗██╔══██╗██╔════╝╚══██╔══╝██║██╔═══██╗████╗  ██║██╔══██╗██║   ██║██╔══██╗██╔══██╗╚██╗ ██╔╝
+ ██████╔╝███████║███████╗   ██║   ██║██║   ██║██╔██╗ ██║██████╔╝██║   ██║██║  ██║██║  ██║ ╚████╔╝
+ ██╔══██╗██╔══██║╚════██║   ██║   ██║██║   ██║██║╚██╗██║██╔══██╗██║   ██║██║  ██║██║  ██║  ╚██╔╝
+ ██████╔╝██║  ██║███████║   ██║   ██║╚██████╔╝██║ ╚████║██████╔╝╚██████╔╝██████╔╝██████╔╝   ██║
+ ╚═════╝ ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═════╝  ╚═════╝ ╚═════╝ ╚═════╝    ╚═╝
+ 
 
 [![Build Status](https://github.com/antnsn/BastionBuddy/actions/workflows/pr-check.yml/badge.svg)](https://github.com/antnsn/BastionBuddy/actions/workflows/pr-check.yml)
 [![Release](https://github.com/antnsn/BastionBuddy/actions/workflows/release.yml/badge.svg)](https://github.com/antnsn/BastionBuddy/releases)
