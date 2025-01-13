@@ -48,11 +48,19 @@ jobs:
           
           if [ -z "$PREVIOUS_TAG" ]; then
             # No previous tag found - list all commits
-            CHANGELOG=$(echo -e "Initial release\n\nChangelog:\n$(git log --pretty=format:'* %s' --reverse)")
+            COMMITS=$(git log --pretty=format:"* %s")
+            CHANGELOG="Initial release with the following changes:${COMMITS//$'\n'/\\n}"
           else
             # Get changes since the previous tag
-            CHANGELOG=$(echo -e "Changes since $PREVIOUS_TAG:\n$(git log --pretty=format:'* %s' $PREVIOUS_TAG..HEAD)")
+            COMMITS=$(git log --pretty=format:"* %s" $PREVIOUS_TAG..HEAD)
+            CHANGELOG="Changes since ${PREVIOUS_TAG}:${COMMITS//$'\n'/\\n}"
           fi
+          
+          # Escape the changelog for GitHub Actions output
+          CHANGELOG="${CHANGELOG//'%'/'%25'}"
+          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+          
           echo "CHANGELOG=$CHANGELOG" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
