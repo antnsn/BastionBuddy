@@ -1,57 +1,68 @@
+// Package utils provides common utility functions for the BastionBuddy application,
+// including menu handling, user input, and Azure CLI command execution.
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/manifoldco/promptui"
 )
 
+// SelectWithMenu presents an interactive menu to the user with the given items and prompt.
+// It returns the selected item and any error that occurred.
 func SelectWithMenu(items []string, prompt string) (string, error) {
 	if len(items) == 0 {
-		return "", fmt.Errorf("no items to select from")
+		return "", errors.New("no items to select from")
 	}
 
-	selectPrompt := promptui.Select{
-		Label: prompt,
-		Items: items,
-		Size:  10, // Show 10 items at a time with scrolling
+	if len(items) == 1 {
+		return items[0], nil
 	}
 
-	_, result, err := selectPrompt.Run()
-	if err != nil {
-		return "", fmt.Errorf("selection failed: %v", err)
+	searcher := func(input string, index int) bool {
+		item := strings.ToLower(items[index])
+		input = strings.ToLower(input)
+		return strings.Contains(item, input)
 	}
 
-	return result, nil
-}
-
-func ReadInput(prompt string) (string, error) {
-	inputPrompt := promptui.Prompt{
+	selector := promptui.Select{
 		Label:    prompt,
-		Validate: func(input string) error {
-			if strings.TrimSpace(input) == "" {
-				return fmt.Errorf("input cannot be empty")
-			}
-			return nil
-		},
+		Items:    items,
+		Size:     10,
+		Searcher: searcher,
 	}
 
-	result, err := inputPrompt.Run()
-	if err != nil {
-		return "", fmt.Errorf("input failed: %v", err)
+	_, result, err := selector.Run()
+	if err == promptui.ErrInterrupt || err == promptui.ErrEOF {
+		return "", errors.New("selection cancelled by user")
 	}
-
-	return strings.TrimSpace(result), nil
+	return result, err
 }
 
+// ReadInput prompts the user for input with the given prompt text.
+// It returns the user's input and any error that occurred.
+func ReadInput(prompt string) (string, error) {
+	prompter := promptui.Prompt{
+		Label: prompt,
+	}
+
+	return prompter.Run()
+}
+
+// AzureCommand executes an Azure CLI command with the given arguments.
+// It returns the command output and any error that occurred.
 func AzureCommand(args ...string) ([]byte, error) {
 	cmd := exec.Command("az", args...)
 	return cmd.Output()
 }
 
+// AzureInteractiveCommand executes an Azure CLI command that requires user interaction.
+// It returns any error that occurred during command execution.
 func AzureInteractiveCommand(args ...string) error {
 	cmd := exec.Command("az", args...)
 	cmd.Stdin = os.Stdin
@@ -60,33 +71,29 @@ func AzureInteractiveCommand(args ...string) error {
 	return cmd.Run()
 }
 
+// AzureSetSubscription sets the active Azure subscription.
+// It returns any error that occurred during the operation.
 func AzureSetSubscription(subscriptionID string) error {
-	return exec.Command("az", "account", "set", "--subscription", subscriptionID).Run()
+	_, err := AzureCommand("account", "set", "--subscription", subscriptionID)
+	return err
 }
 
+// ExtractIDFromParentheses extracts an ID from a string that contains it within parentheses.
+// For example, "Resource Group (12345)" returns "12345".
 func ExtractIDFromParentheses(input string) (string, error) {
-	start := strings.Index(input, "(")
-	end := strings.Index(input, ")")
-	if start == -1 || end == -1 || start >= end {
-		return "", fmt.Errorf("invalid format: %s", input)
+	re := regexp.MustCompile(`\((.*?)\)`)
+	matches := re.FindStringSubmatch(input)
+	if len(matches) < 2 {
+		return "", fmt.Errorf("no ID found in parentheses in input: %s", input)
 	}
-	return input[start+1 : end], nil
+	return matches[1], nil
 }
 
+// CheckDependencies verifies that all required external dependencies are available.
+// Currently checks for the Azure CLI (az) command.
 func CheckDependencies() error {
-	dependencies := []string{"az"}
-	var missing []string
-
-	for _, dep := range dependencies {
-		_, err := exec.LookPath(dep)
-		if err != nil {
-			missing = append(missing, dep)
-		}
+	if _, err := exec.LookPath("az"); err != nil {
+		return fmt.Errorf("Azure CLI (az) is not installed. Please install it from https://docs.microsoft.com/cli/azure/install-azure-cli")
 	}
-
-	if len(missing) > 0 {
-		return fmt.Errorf("missing required dependencies: %s", strings.Join(missing, ", "))
-	}
-
 	return nil
 }

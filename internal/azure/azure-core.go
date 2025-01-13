@@ -1,210 +1,226 @@
+// Package azure provides functionality for interacting with Azure resources
+// through the Azure SDK, specifically for Bastion connections.
 package azure
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"time"
+	"strings"
 
-	"github.com/antnsn/BastionBuddy/internal/cache"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/subscription/armsubscription"
 	"github.com/antnsn/BastionBuddy/internal/utils"
-	"github.com/antnsn/BastionBuddy/internal/welcome"
 )
 
-var cacheInstance *cache.Cache
-
 func init() {
-	cacheDir := filepath.Join(os.TempDir(), "bastionbuddy-cache")
-	cacheInstance = cache.NewCache(cacheDir, 1*time.Hour)
+	ctx = context.Background()
 }
 
-// CheckDependencies verifies that all required Azure CLI dependencies are installed
+// CheckDependencies verifies that all required Azure dependencies are available.
 func CheckDependencies() error {
-	return utils.CheckDependencies()
-}
-
-// Cleanup performs any necessary cleanup operations
-func Cleanup() {
-	if cacheInstance != nil {
-		_ = cacheInstance.Cleanup()
+	var err error
+	cred, err = azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create credential: %v", err)
 	}
+	return nil
 }
 
-// ensureAuthenticated ensures the user is authenticated with Azure CLI
+// Cleanup performs any necessary cleanup operations.
+func Cleanup() error {
+	return nil
+}
+
+// ensureAuthenticated ensures the user is logged into Azure.
 func ensureAuthenticated() error {
-	if _, err := utils.AzureCommand("account", "show", "--query", "id", "-o", "tsv"); err != nil {
-		fmt.Println("Authenticating with Azure...")
-		if _, err := utils.AzureCommand("login", "--use-device-code"); err != nil {
+	if cred == nil {
+		var err error
+		cred, err = azidentity.NewDefaultAzureCredential(nil)
+		if err != nil {
 			return fmt.Errorf("authentication failed: %v", err)
 		}
 	}
 	return nil
 }
 
-// selectSubscription prompts the user to select an Azure subscription
-func selectSubscription(prompt string) (string, error) {
+// selectSubscription prompts the user to select an Azure subscription.
+func selectSubscription(prompt string) error {
 	fmt.Printf("Fetching subscriptions for %s...\n", prompt)
 
-	output, err := utils.AzureCommand("account", "list", "--query", "[].{Name:name, Id:id}", "-o", "json")
+	// Create subscription client
+	client, err := armsubscription.NewSubscriptionsClient(cred, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to list subscriptions: %v", err)
+		return fmt.Errorf("failed to create subscription client: %v", err)
 	}
 
-	var subs []struct {
-		Name string `json:"Name"`
-		ID   string `json:"Id"`
-	}
-	if err := json.Unmarshal(output, &subs); err != nil {
-		return "", fmt.Errorf("failed to parse subscriptions: %v", err)
+	// List all subscriptions
+	pager := client.NewListPager(nil)
+	var items []string
+
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to list subscriptions: %v", err)
+		}
+		for _, sub := range page.Value {
+			if sub.DisplayName == nil || sub.SubscriptionID == nil {
+				continue
+			}
+			items = append(items, fmt.Sprintf("%s (%s)", *sub.DisplayName, *sub.SubscriptionID))
+		}
 	}
 
-	var options []string
-	for _, sub := range subs {
-		options = append(options, fmt.Sprintf("%s (%s)", sub.Name, sub.ID))
+	if len(items) == 0 {
+		return fmt.Errorf("no subscriptions found")
 	}
 
-	selected, err := utils.SelectWithMenu(options, fmt.Sprintf("Select subscription for %s:", prompt))
+	// Let user select subscription
+	selected, err := utils.SelectWithMenu(items, fmt.Sprintf("Select subscription for %s:", prompt))
 	if err != nil {
-		return "", fmt.Errorf("failed to select subscription: %v", err)
+		if strings.Contains(err.Error(), "cancelled by user") {
+			fmt.Println("\nOperation cancelled by user")
+			os.Exit(0)
+		}
+		return fmt.Errorf("failed to select subscription: %v", err)
 	}
 
-	return utils.ExtractIDFromParentheses(selected)
+	// Extract subscription ID from selection
+	subID, err = utils.ExtractIDFromParentheses(selected)
+	if err != nil {
+		return fmt.Errorf("failed to extract subscription ID: %v", err)
+	}
+
+	return nil
 }
 
-// SelectConnectionType prompts the user to select a connection type
+// SelectConnectionType prompts the user to select the type of connection.
 func SelectConnectionType() (string, error) {
-	welcome.ShowWelcome()
-	return utils.SelectWithMenu([]string{"ssh", "tunnel"}, "Select connection type:")
+	return utils.SelectWithMenu([]string{"ssh", "tunnel"}, "Select connection type")
 }
 
-// GetAzureResources gathers all necessary Azure resource information
-func GetAzureResources() (*AzureConfig, error) {
+// GetAzureResources retrieves the necessary Azure resource configuration.
+func GetAzureResources() (*ResourceConfig, error) {
 	if err := ensureAuthenticated(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to authenticate: %v", err)
 	}
 
-	config := &AzureConfig{}
+	// Select subscription for Bastion host
+	if err := selectSubscription("Bastion host"); err != nil {
+		return nil, fmt.Errorf("failed to select subscription: %v", err)
+	}
 
-	// Select Bastion subscription
-	bastionSubID, err := selectSubscription("Bastion host")
+	// Get Bastion host details
+	bastion, err := GetBastionDetails()
 	if err != nil {
-		return nil, fmt.Errorf("failed to select Bastion subscription: %v", err)
+		return nil, fmt.Errorf("failed to get Bastion details: %v", err)
 	}
 
-	if err := utils.AzureSetSubscription(bastionSubID); err != nil {
-		return nil, fmt.Errorf("failed to set Bastion subscription: %v", err)
+	// Save Bastion subscription ID
+	bastionSubID := subID
+
+	// Select subscription for virtual machine
+	if err := selectSubscription("virtual machine"); err != nil {
+		return nil, fmt.Errorf("failed to select subscription: %v", err)
 	}
 
-	// Get Bastion details
-	bastionName, bastionRG, err := GetBastionDetails(bastionSubID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get bastion details: %v", err)
-	}
-	config.BastionName = bastionName
-	config.BastionResourceGroup = bastionRG
-
-	// Get target resource ID
-	resourceID, err := GetTargetResource()
+	// Get target resource details
+	target, err := GetTargetResource(ctx, subID, cred)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get target resource: %v", err)
 	}
-	config.ResourceID = resourceID
 
-	// Switch back to Bastion subscription for the connection
-	if err := utils.AzureSetSubscription(bastionSubID); err != nil {
-		return nil, fmt.Errorf("failed to set subscription for connection: %v", err)
-	}
+	// Restore Bastion subscription ID for future use
+	subID = bastionSubID
 
-	return config, nil
+	return &ResourceConfig{
+		BastionHost:    bastion,
+		TargetResource: target,
+	}, nil
 }
 
-// Connect establishes a connection using the specified type and configuration
-func Connect(connectionType string, config *AzureConfig) error {
+// Connect establishes a connection to an Azure resource using the specified connection type.
+func Connect(connectionType string, config *ResourceConfig) error {
+	if config == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+
 	switch connectionType {
 	case "ssh":
 		return connectSSH(config)
 	case "tunnel":
 		return connectTunnel(config)
 	default:
-		return fmt.Errorf("unsupported connection type: %s", connectionType)
+		return fmt.Errorf("invalid connection type: %s", connectionType)
 	}
 }
 
-func connectSSH(config *AzureConfig) error {
+func connectSSH(config *ResourceConfig) error {
 	if config.Username == "" {
-		username, err := utils.ReadInput("Enter username: ")
+		username, err := utils.ReadInput("Enter username")
 		if err != nil {
 			return fmt.Errorf("failed to read username: %v", err)
-		}
-		if username == "" {
-			return fmt.Errorf("username cannot be empty")
 		}
 		config.Username = username
 	}
 
-	fmt.Printf("Debug: Connecting to resource '%s' via SSH with username '%s'\n", config.ResourceID, config.Username)
-	fmt.Printf("Debug: Using Bastion host '%s' in resource group '%s'\n", config.BastionName, config.BastionResourceGroup)
-	
-	err := utils.AzureInteractiveCommand("network", "bastion", "ssh",
-		"--name", config.BastionName,
-		"--resource-group", config.BastionResourceGroup,
-		"--target-resource-id", config.ResourceID,
+	fmt.Println("Connecting via SSH...")
+	// TODO: Implement SSH connection using Azure SDK
+	// For now, use the existing CLI command
+	args := []string{
+		"network", "bastion", "ssh",
+		"--name", config.BastionHost.Name,
+		"--resource-group", config.BastionHost.ResourceGroup,
+		"--target-resource-id", config.TargetResource.ID,
 		"--auth-type", "password",
-		"--username", config.Username)
-	if err != nil {
-		return fmt.Errorf("failed to establish SSH connection: %v\nPlease check:\n"+
-			"1. The Bastion host name and resource group are correct\n"+
-			"2. You have the necessary permissions on both the Bastion and target resources\n"+
-			"3. The target resource is running and accessible\n"+
-			"4. The username is correct and exists on the target resource", err)
+		"--username", config.Username,
 	}
+
+	if err := utils.AzureInteractiveCommand(args...); err != nil {
+		return fmt.Errorf("failed to establish SSH connection: %v", err)
+	}
+
 	return nil
 }
 
-func connectTunnel(config *AzureConfig) error {
-	if config.LocalPort == 0 {
-		input, err := utils.ReadInput("Enter the local port for the tunnel (e.g., 50022): ")
-		if err != nil {
-			return fmt.Errorf("failed to read local port: %v", err)
-		}
-		var port int
-		if _, err := fmt.Sscanf(input, "%d", &port); err != nil {
-			return fmt.Errorf("invalid local port: %v", err)
-		}
-		config.LocalPort = port
-	}
-
+func connectTunnel(config *ResourceConfig) error {
 	if config.RemotePort == 0 {
-		input, err := utils.ReadInput("Enter the resource port (default 22): ")
+		remotePort, err := utils.ReadInput("Enter the resource port (default 22)")
 		if err != nil {
 			return fmt.Errorf("failed to read remote port: %v", err)
 		}
-		if input == "" {
-			config.RemotePort = 22
-		} else {
-			var port int
-			if _, err := fmt.Sscanf(input, "%d", &port); err != nil {
-				return fmt.Errorf("invalid remote port: %v", err)
-			}
-			config.RemotePort = port
+		if remotePort == "" {
+			remotePort = "22"
+		}
+		if _, err := fmt.Sscanf(remotePort, "%d", &config.RemotePort); err != nil {
+			return fmt.Errorf("invalid remote port: %v", err)
 		}
 	}
 
-	fmt.Printf("Creating tunnel from localhost:%d to %s:%d...\n",
-		config.LocalPort, config.ResourceID, config.RemotePort)
+	if config.LocalPort == 0 {
+		localPort, err := utils.ReadInput("Enter the local port for the tunnel (e.g., 50022)")
+		if err != nil {
+			return fmt.Errorf("failed to read local port: %v", err)
+		}
+		if _, err := fmt.Sscanf(localPort, "%d", &config.LocalPort); err != nil {
+			return fmt.Errorf("invalid local port: %v", err)
+		}
+	}
 
-	_, err := utils.AzureCommand("network", "bastion", "tunnel",
-		"--name", config.BastionName,
-		"--resource-group", config.BastionResourceGroup,
-		"--target-resource-id", config.ResourceID,
+	fmt.Println("Establishing tunnel...")
+	// TODO: Implement tunnel connection using Azure SDK
+	// For now, use the existing CLI command
+	args := []string{
+		"network", "bastion", "tunnel",
+		"--name", config.BastionHost.Name,
+		"--resource-group", config.BastionHost.ResourceGroup,
+		"--target-resource-id", config.TargetResource.ID,
 		"--resource-port", fmt.Sprintf("%d", config.RemotePort),
-		"--port", fmt.Sprintf("%d", config.LocalPort))
-	if err != nil {
-		return fmt.Errorf("failed to establish tunnel: %v\nPlease check:\n"+
-			"1. The Bastion host name and resource group are correct\n"+
-			"2. You have the necessary permissions on both the Bastion and target resources\n"+
-			"3. The target resource is running and accessible", err)
+		"--port", fmt.Sprintf("%d", config.LocalPort),
+	}
+
+	if err := utils.AzureInteractiveCommand(args...); err != nil {
+		return fmt.Errorf("failed to establish tunnel: %v", err)
 	}
 
 	fmt.Printf("Tunnel established! You can now connect to localhost:%d\n", config.LocalPort)

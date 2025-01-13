@@ -1,5 +1,9 @@
 # BastionBuddy
 
+[![Build Status](https://github.com/antnsn/BastionBuddy/actions/workflows/pr-check.yml/badge.svg)](https://github.com/antnsn/BastionBuddy/actions/workflows/pr-check.yml)
+[![Release](https://github.com/antnsn/BastionBuddy/actions/workflows/release.yml/badge.svg)](https://github.com/antnsn/BastionBuddy/releases)
+[![codecov](https://codecov.io/gh/antnsn/BastionBuddy/branch/main/graph/badge.svg)](https://codecov.io/gh/antnsn/BastionBuddy)
+
 A friendly command-line utility that makes Azure Bastion connections easy and interactive.
 
 ## Features
@@ -50,6 +54,46 @@ The interactive menu will guide you through:
 - Type to search in lists
 - Press Enter to select
 - Use Ctrl+C to exit at any time
+
+## Development
+
+### Local Testing
+
+Before pushing changes, you can run all checks locally using:
+```bash
+./scripts/check.sh
+```
+
+This will:
+1. Run the linter
+2. Execute tests with race detection
+3. Generate and display coverage report
+4. Build for current platform
+5. Test build for all supported platforms
+
+A pre-commit hook is also available that runs these checks automatically before each commit.
+
+### Continuous Integration
+
+The following checks run automatically on pull requests:
+- Code linting with golangci-lint
+- Unit tests with race detection
+- Code coverage reporting
+- Multi-platform build verification
+
+### Release Process
+
+1. Update version number where needed
+2. Create and push a new tag:
+   ```bash
+   git tag v1.x.x
+   git push origin v1.x.x
+   ```
+3. GitHub Actions will automatically:
+   - Build for all platforms
+   - Create GitHub release
+   - Upload binaries
+   - Generate changelog
 
 ## Building from Source
 

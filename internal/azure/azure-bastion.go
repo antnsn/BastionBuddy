@@ -1,84 +1,168 @@
 package azure
 
 import (
-	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/antnsn/BastionBuddy/internal/utils"
 )
 
-// GetBastionDetails prompts the user to select or input bastion details
-func GetBastionDetails(subscriptionID string) (string, string, error) {
-	fmt.Println("Select how to specify the Bastion host:")
-	selectionMethod, err := utils.SelectWithMenu([]string{"manual-input", "select-bastion"}, "Selection method:")
+// BastionHost represents an Azure Bastion host.
+type BastionHost struct {
+	Name          string
+	ResourceGroup string
+}
+
+// GetBastionDetails retrieves the Bastion host details either through
+// manual input or by selecting from available hosts.
+func GetBastionDetails() (*BastionHost, error) {
+	selectionMethod, err := utils.SelectWithMenu([]string{"select-host", "manual-input"}, "How would you like to specify the Bastion host?")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to select method: %v", err)
+		if strings.Contains(err.Error(), "cancelled by user") {
+			fmt.Println("\nOperation cancelled by user")
+			os.Exit(0)
+		}
+		return nil, fmt.Errorf("failed to get selection method: %v", err)
 	}
 
 	switch selectionMethod {
+	case "select-host":
+		return GetBastionSelection()
 	case "manual-input":
-		return getBastionManualInput()
-	case "select-bastion":
-		return getBastionSelection(subscriptionID)
+		return GetBastionManualInput()
 	default:
-		return "", "", fmt.Errorf("invalid selection method: %s", selectionMethod)
+		return nil, fmt.Errorf("invalid selection method: %s", selectionMethod)
 	}
 }
 
-func getBastionManualInput() (string, string, error) {
-	bastionName, err := utils.ReadInput("Enter Bastion host name: ")
+// GetBastionManualInput prompts the user to manually input Bastion host details.
+func GetBastionManualInput() (*BastionHost, error) {
+	name, err := utils.ReadInput("Enter Bastion host name")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to read bastion name: %v", err)
+		if strings.Contains(err.Error(), "cancelled by user") {
+			fmt.Println("\nOperation cancelled by user")
+			os.Exit(0)
+		}
+		return nil, fmt.Errorf("failed to read Bastion host name: %v", err)
 	}
-	if bastionName == "" {
-		return "", "", fmt.Errorf("bastion name cannot be empty")
+	if name == "" {
+		return nil, fmt.Errorf("Bastion host name cannot be empty")
 	}
 
-	bastionRG, err := utils.ReadInput("Enter Bastion resource group: ")
+	resourceGroup, err := utils.ReadInput("Enter Bastion resource group")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to read resource group: %v", err)
+		if strings.Contains(err.Error(), "cancelled by user") {
+			fmt.Println("\nOperation cancelled by user")
+			os.Exit(0)
+		}
+		return nil, fmt.Errorf("failed to read resource group: %v", err)
 	}
-	if bastionRG == "" {
-		return "", "", fmt.Errorf("resource group cannot be empty")
+	if resourceGroup == "" {
+		return nil, fmt.Errorf("resource group cannot be empty")
 	}
 
-	return bastionName, bastionRG, nil
+	return &BastionHost{
+		Name:          name,
+		ResourceGroup: resourceGroup,
+	}, nil
 }
 
-func getBastionSelection(subscriptionID string) (string, string, error) {
+// GetBastionSelection retrieves available Bastion hosts and lets the user select one.
+func GetBastionSelection() (*BastionHost, error) {
 	fmt.Println("Fetching Bastion hosts...")
-	data, err := cacheInstance.Get(fmt.Sprintf("bastions_%s.json", subscriptionID), func() ([]byte, error) {
-		return utils.AzureCommand("network", "bastion", "list")
+
+	// Create resources client
+	resourceClient, err := armresources.NewClient(subID, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resources client: %v", err)
+	}
+
+	// List all Bastion hosts using resource client
+	filter := "resourceType eq 'Microsoft.Network/bastionHosts'"
+	fmt.Printf("Using filter: %s\n", filter)
+	pager := resourceClient.NewListPager(&armresources.ClientListOptions{
+		Filter: &filter,
 	})
+
+	var items []string
+	pageCount := 0
+	for pager.More() {
+		pageCount++
+		fmt.Printf("Fetching page %d...\n", pageCount)
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list Bastion hosts: %v", err)
+		}
+
+		fmt.Printf("Found %d resources on page %d\n", len(page.Value), pageCount)
+		for _, resource := range page.Value {
+			if resource.Name == nil {
+				fmt.Println("Found resource with nil name, skipping")
+				continue
+			}
+
+			fmt.Printf("Found resource: Name=%s, Type=%s, ID=%s\n", *resource.Name, *resource.Type, *resource.ID)
+
+			// Extract resource group from ID
+			parts := strings.Split(*resource.ID, "/")
+			var resourceGroup string
+			for i, part := range parts {
+				if strings.EqualFold(part, "resourceGroups") && i+1 < len(parts) {
+					resourceGroup = parts[i+1]
+					break
+				}
+			}
+			if resourceGroup == "" {
+				fmt.Printf("Could not extract resource group from ID: %s\n", *resource.ID)
+				continue
+			}
+
+			items = append(items, fmt.Sprintf("%s (%s)", *resource.Name, resourceGroup))
+		}
+	}
+
+	if len(items) == 0 {
+		// Try listing without filter to see what resources are available
+		fmt.Println("No Bastion hosts found, listing all resources to debug...")
+		pager = resourceClient.NewListPager(nil)
+		for pager.More() {
+			page, err := pager.NextPage(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to list resources: %v", err)
+			}
+			for _, resource := range page.Value {
+				if resource.Type != nil && resource.Name != nil {
+					fmt.Printf("Available resource: Type=%s, Name=%s\n", *resource.Type, *resource.Name)
+				}
+			}
+		}
+		return nil, fmt.Errorf("no Bastion hosts found in subscription %s", subID)
+	}
+
+	// Let user select a Bastion host
+	selected, err := utils.SelectWithMenu(items, "Select Bastion host:")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to list bastion hosts: %v", err)
+		if strings.Contains(err.Error(), "cancelled by user") {
+			fmt.Println("\nOperation cancelled by user")
+			os.Exit(0)
+		}
+		return nil, fmt.Errorf("failed to select Bastion host: %v", err)
 	}
 
-	var bastions []BastionHost
-	if err := json.Unmarshal(data, &bastions); err != nil {
-		return "", "", fmt.Errorf("failed to parse bastion hosts: %v", err)
-	}
-
-	if len(bastions) == 0 {
-		return "", "", fmt.Errorf("no Bastion hosts found or insufficient permissions")
-	}
-
-	var options []string
-	for _, bastion := range bastions {
-		options = append(options, fmt.Sprintf("%s (Resource Group: %s)",
-			bastion.Name, bastion.ResourceGroup))
-	}
-
-	selected, err := utils.SelectWithMenu(options, "Select Bastion host:")
+	// Extract resource group from selection
+	resourceGroup, err := utils.ExtractIDFromParentheses(selected)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to select bastion host: %v", err)
+		return nil, fmt.Errorf("failed to extract resource group: %v", err)
 	}
 
-	parts := strings.Split(selected, " (Resource Group: ")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid bastion selection format")
-	}
+	// Extract name from selection
+	name := selected[:len(selected)-len(resourceGroup)-3]
+	name = strings.TrimSpace(name)
 
-	return parts[0], strings.TrimRight(parts[1], ")"), nil
+	return &BastionHost{
+		Name:          name,
+		ResourceGroup: resourceGroup,
+	}, nil
 }
