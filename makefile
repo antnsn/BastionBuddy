@@ -3,6 +3,7 @@
 BINARY_NAME=bastionbuddy
 BUILD_DIR=builds
 VERSION=$(shell git describe --tags --always --dirty)
+PLATFORMS=darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 
 # Default build for current platform
 build:
@@ -11,24 +12,25 @@ build:
 
 # Build for all supported platforms
 all:
-	mkdir -p $(BUILD_DIR)
-	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)_darwin_amd64 -ldflags="-X 'main.Version=$(VERSION)'" ./cmd/azbastion
-	GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(BINARY_NAME)_darwin_arm64 -ldflags="-X 'main.Version=$(VERSION)'" ./cmd/azbastion
-	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)_linux_amd64 -ldflags="-X 'main.Version=$(VERSION)'" ./cmd/azbastion
-	GOOS=linux GOARCH=arm64 go build -o $(BUILD_DIR)/$(BINARY_NAME)_linux_arm64 -ldflags="-X 'main.Version=$(VERSION)'" ./cmd/azbastion
+	@for platform in $(PLATFORMS); do \
+		GOOS=$${platform%/*} ; \
+		GOARCH=$${platform#*/} ; \
+		OUTPUT_DIR=$(BUILD_DIR)/$${GOOS}_$${GOARCH} ; \
+		echo "Building for $${GOOS}/$${GOARCH}..." ; \
+		mkdir -p $${OUTPUT_DIR} ; \
+		GOOS=$${GOOS} GOARCH=$${GOARCH} go build -o $${OUTPUT_DIR}/$(BINARY_NAME) -ldflags="-X 'main.Version=$(VERSION)'" ./cmd/azbastion ; \
+	done
 
 # Create release archives
 release: all
-	cd $(BUILD_DIR) && \
-	for file in $(BINARY_NAME)_* ; do \
-		platform=$${file#$(BINARY_NAME)_} ; \
-		mkdir -p tmp/$$platform ; \
-		cp $$file tmp/$$platform/$(BINARY_NAME) ; \
-		cd tmp/$$platform && tar czf ../../$${file}.tar.gz $(BINARY_NAME) && cd ../.. ; \
-		rm -rf tmp/$$platform ; \
+	@cd $(BUILD_DIR) && \
+	for platform in $(PLATFORMS); do \
+		GOOS=$${platform%/*} ; \
+		GOARCH=$${platform#*/} ; \
+		echo "Creating archive for $${GOOS}/$${GOARCH}..." ; \
+		tar czf $(BINARY_NAME)_$${GOOS}_$${GOARCH}.tar.gz -C $${GOOS}_$${GOARCH} $(BINARY_NAME) ; \
 	done && \
-	rm -rf tmp && \
-	rm $(BINARY_NAME)_*
+	rm -rf darwin_* linux_*
 
 clean:
 	rm -rf $(BUILD_DIR)
