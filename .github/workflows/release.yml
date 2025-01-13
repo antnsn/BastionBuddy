@@ -47,23 +47,24 @@ jobs:
           
           # Generate changelog
           if [ "$PREVIOUS_TAG" != "" ]; then
-            echo "CHANGELOG<<EOF" >> $GITHUB_ENV
-            echo "Changes since $PREVIOUS_TAG:" >> $GITHUB_ENV
-            git log --pretty=format:"* %s" $PREVIOUS_TAG..${{ env.VERSION }} >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+            changelog="Changes since $PREVIOUS_TAG:\n"
+            changelog+="$(git log --pretty=format:"* %s" $PREVIOUS_TAG..${{ env.VERSION }})"
           else
-            echo "CHANGELOG<<EOF" >> $GITHUB_ENV
-            echo "Initial release" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+            changelog="Initial release"
           fi
+          
+          # Save changelog to output
+          echo "changelog<<CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+          echo "$changelog" >> "$GITHUB_OUTPUT"
+          echo "CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          name: BastionBuddy ${{ env.VERSION }}
-          body: ${{ env.CHANGELOG }}
-          files: builds/*.zip
-          draft: false
-          prerelease: false
+          name: Release ${{ env.VERSION }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          files: |
+            builds/*.tar.gz
+            builds/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
