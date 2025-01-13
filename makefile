@@ -1,6 +1,6 @@
 .PHONY: build clean test lint all release
 
-BINARY_NAME=bastionBuddy
+BINARY_NAME=bastionbuddy
 BUILD_DIR=builds
 VERSION=$(shell git describe --tags --always --dirty)
 
@@ -21,9 +21,14 @@ all:
 release: all
 	cd $(BUILD_DIR) && \
 	for file in $(BINARY_NAME)_* ; do \
-		zip $${file}.zip $$file ; \
-		rm $$file ; \
-	done
+		platform=$${file#$(BINARY_NAME)_} ; \
+		mkdir -p tmp/$$platform ; \
+		cp $$file tmp/$$platform/$(BINARY_NAME) ; \
+		cd tmp/$$platform && tar czf ../../$${file}.tar.gz $(BINARY_NAME) && cd ../.. ; \
+		rm -rf tmp/$$platform ; \
+	done && \
+	rm -rf tmp && \
+	rm $(BINARY_NAME)_*
 
 clean:
 	rm -rf $(BUILD_DIR)
