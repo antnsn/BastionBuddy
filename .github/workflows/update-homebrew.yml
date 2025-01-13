@@ -3,6 +3,8 @@ name: Update Homebrew Formula
 on:
   release:
     types: [published]
+  repository_dispatch:
+    types: [release_published]
 
 jobs:
   update-homebrew:
@@ -18,8 +20,12 @@ jobs:
       - name: Get release info
         id: release
         run: |
-          echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-          
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "version=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Calculate SHA256 for Darwin ARM64
         run: |
           curl -L "https://github.com/antnsn/BastionBuddy/releases/download/v${{ steps.release.outputs.version }}/bastionbuddy_${{ steps.release.outputs.version }}_darwin_arm64.tar.gz" -o darwin_arm64.tar.gz
