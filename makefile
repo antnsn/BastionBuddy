@@ -1,6 +1,6 @@
 .PHONY: build clean test lint
 
-BINARY_NAME=azbastion
+BINARY_NAME=bastionBuddy
 BUILD_DIR=bin
 
 build:

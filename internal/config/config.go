@@ -8,8 +8,8 @@ import (
 type Config struct {
 	ConnectionType string
 	Username      string
-	LocalPort     string
-	RemotePort    string
+	LocalPort     int
+	RemotePort    int
 	CacheTimeout  int
 	CacheDir      string
 }

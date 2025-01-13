@@ -1,0 +1,87 @@
+name: Release BastionBuddy
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags
+
+permissions:
+  contents: write # Needed for creating releases
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache: true
+      
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Build for multiple platforms
+        run: |
+          # Create builds directory
+          mkdir -p builds
+          
+          # Build for each platform
+          PLATFORMS=("darwin/amd64" "darwin/arm64" "linux/amd64" "linux/arm64")
+          
+          for platform in "${PLATFORMS[@]}"; do
+            # Split platform into OS and architecture
+            IFS='/' read -r -a array <<< "$platform"
+            GOOS="${array[0]}"
+            GOARCH="${array[1]}"
+            
+            # Set output binary name
+            output_name="bastionBuddy_${GOOS}_${GOARCH}"
+            if [ "$GOOS" = "windows" ]; then
+              output_name+='.exe'
+            fi
+            
+            echo "Building for $GOOS/$GOARCH..."
+            GOOS=$GOOS GOARCH=$GOARCH go build -o "builds/$output_name" -ldflags="-X 'main.Version=${{ env.VERSION }}'" ./cmd/azbastion
+            
+            # Create ZIP archive
+            cd builds
+            zip "${output_name}.zip" "$output_name"
+            rm "$output_name"
+            cd ..
+          done
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get latest tag
+          git fetch --tags
+          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -A 1 ${{ env.VERSION }} | tail -n 1)
+          
+          # Generate changelog
+          if [ "$PREVIOUS_TAG" != "" ]; then
+            echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+            echo "Changes since $PREVIOUS_TAG:" >> $GITHUB_ENV
+            git log --pretty=format:"* %s" $PREVIOUS_TAG..${{ env.VERSION }} >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          else
+            echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+            echo "Initial release" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: BastionBuddy ${{ env.VERSION }}
+          body: ${{ env.CHANGELOG }}
+          files: builds/*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

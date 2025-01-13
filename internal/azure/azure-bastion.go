@@ -5,20 +5,15 @@ import (
 	"fmt"
 	"strings"
 
-	"../internal/azure/cache"
-	"../internal/azure/utils"
+	"github.com/antnsn/BastionBuddy/internal/utils"
 )
 
-type BastionHost struct {
-	Name          string `json:"name"`
-	ResourceGroup string `json:"resourceGroup"`
-}
-
+// GetBastionDetails prompts the user to select or input bastion details
 func GetBastionDetails(subscriptionID string) (string, string, error) {
 	fmt.Println("Select how to specify the Bastion host:")
-	selectionMethod, err := utils.SelectWithFzf([]string{"manual-input", "select-bastion"}, "Selection method: ")
+	selectionMethod, err := utils.SelectWithMenu([]string{"manual-input", "select-bastion"}, "Selection method:")
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to select method: %v", err)
 	}
 
 	switch selectionMethod {
@@ -34,12 +29,18 @@ func GetBastionDetails(subscriptionID string) (string, string, error) {
 func getBastionManualInput() (string, string, error) {
 	bastionName, err := utils.ReadInput("Enter Bastion host name: ")
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to read bastion name: %v", err)
+	}
+	if bastionName == "" {
+		return "", "", fmt.Errorf("bastion name cannot be empty")
 	}
 
 	bastionRG, err := utils.ReadInput("Enter Bastion resource group: ")
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to read resource group: %v", err)
+	}
+	if bastionRG == "" {
+		return "", "", fmt.Errorf("resource group cannot be empty")
 	}
 
 	return bastionName, bastionRG, nil
@@ -47,16 +48,16 @@ func getBastionManualInput() (string, string, error) {
 
 func getBastionSelection(subscriptionID string) (string, string, error) {
 	fmt.Println("Fetching Bastion hosts...")
-	data, err := cache.Get(fmt.Sprintf("bastions_%s.json", subscriptionID), func() ([]byte, error) {
+	data, err := cacheInstance.Get(fmt.Sprintf("bastions_%s.json", subscriptionID), func() ([]byte, error) {
 		return utils.AzureCommand("network", "bastion", "list")
 	})
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to list bastion hosts: %v", err)
 	}
 
 	var bastions []BastionHost
 	if err := json.Unmarshal(data, &bastions); err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to parse bastion hosts: %v", err)
 	}
 
 	if len(bastions) == 0 {
@@ -69,9 +70,9 @@ func getBastionSelection(subscriptionID string) (string, string, error) {
 			bastion.Name, bastion.ResourceGroup))
 	}
 
-	selected, err := utils.SelectWithFzf(options, "Select Bastion host: ")
+	selected, err := utils.SelectWithMenu(options, "Select Bastion host:")
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to select bastion host: %v", err)
 	}
 
 	parts := strings.Split(selected, " (Resource Group: ")

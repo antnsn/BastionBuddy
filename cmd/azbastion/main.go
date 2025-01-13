@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/yourusername/azbastion/internal/azure"
-	"github.com/yourusername/azbastion/internal/config"
+	"github.com/antnsn/BastionBuddy/internal/azure"
+	"github.com/antnsn/BastionBuddy/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -49,11 +49,11 @@ func main() {
 	flags := rootCmd.Flags()
 	flags.StringVarP(&cfg.ConnectionType, "type", "t", "", "Connection type (ssh|rdp|tunnel)")
 	flags.StringVarP(&cfg.Username, "username", "u", "", "Username for SSH connection")
-	flags.StringVarP(&cfg.LocalPort, "port", "p", "", "Local port for tunnel")
-	flags.StringVarP(&cfg.RemotePort, "remote", "r", "", "Remote port for tunnel")
+	flags.IntVarP(&cfg.LocalPort, "local-port", "l", 0, "Local port for tunnel connection")
+	flags.IntVarP(&cfg.RemotePort, "remote-port", "r", 0, "Remote port for tunnel connection")
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
