@@ -1,59 +1,43 @@
-name: Update Homebrew Formula
+name: Update Formula
 
 on:
-  release:
-    types: [published]
   repository_dispatch:
-    types: [release_published]
+    types: [update_formula]
 
 jobs:
-  update-homebrew:
+  update:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout homebrew-bastionbuddy
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          repository: antnsn/homebrew-bastionbuddy
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          path: homebrew-bastionbuddy
-
-      - name: Get release info
-        id: release
-        run: |
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            echo "version=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-          fi
 
       - name: Calculate SHA256 for Darwin ARM64
         run: |
-          curl -L "https://github.com/antnsn/BastionBuddy/releases/download/v${{ steps.release.outputs.version }}/bastionbuddy_${{ steps.release.outputs.version }}_darwin_arm64.tar.gz" -o darwin_arm64.tar.gz
+          curl -L "https://github.com/antnsn/BastionBuddy/releases/download/v${{ github.event.client_payload.version }}/bastionbuddy_${{ github.event.client_payload.version }}_darwin_arm64.tar.gz" -o darwin_arm64.tar.gz
           echo "darwin_arm64_sha=$(sha256sum darwin_arm64.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_ENV
 
       - name: Calculate SHA256 for Darwin AMD64
         run: |
-          curl -L "https://github.com/antnsn/BastionBuddy/releases/download/v${{ steps.release.outputs.version }}/bastionbuddy_${{ steps.release.outputs.version }}_darwin_amd64.tar.gz" -o darwin_amd64.tar.gz
+          curl -L "https://github.com/antnsn/BastionBuddy/releases/download/v${{ github.event.client_payload.version }}/bastionbuddy_${{ github.event.client_payload.version }}_darwin_amd64.tar.gz" -o darwin_amd64.tar.gz
           echo "darwin_amd64_sha=$(sha256sum darwin_amd64.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_ENV
 
       - name: Calculate SHA256 for Linux ARM64
         run: |
-          curl -L "https://github.com/antnsn/BastionBuddy/releases/download/v${{ steps.release.outputs.version }}/bastionbuddy_${{ steps.release.outputs.version }}_linux_arm64.tar.gz" -o linux_arm64.tar.gz
+          curl -L "https://github.com/antnsn/BastionBuddy/releases/download/v${{ github.event.client_payload.version }}/bastionbuddy_${{ github.event.client_payload.version }}_linux_arm64.tar.gz" -o linux_arm64.tar.gz
           echo "linux_arm64_sha=$(sha256sum linux_arm64.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_ENV
 
       - name: Calculate SHA256 for Linux AMD64
         run: |
-          curl -L "https://github.com/antnsn/BastionBuddy/releases/download/v${{ steps.release.outputs.version }}/bastionbuddy_${{ steps.release.outputs.version }}_linux_amd64.tar.gz" -o linux_amd64.tar.gz
+          curl -L "https://github.com/antnsn/BastionBuddy/releases/download/v${{ github.event.client_payload.version }}/bastionbuddy_${{ github.event.client_payload.version }}_linux_amd64.tar.gz" -o linux_amd64.tar.gz
           echo "linux_amd64_sha=$(sha256sum linux_amd64.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_ENV
 
-      - name: Update formula
+      - name: Update Formula
         run: |
-          cd homebrew-bastionbuddy
           cat > Formula/bastionbuddy.rb << EOL
           class Bastionbuddy < Formula
             desc "CLI tool for managing Azure Bastion connections"
             homepage "https://github.com/antnsn/BastionBuddy"
-            version "${{ steps.release.outputs.version }}"
+            version "${{ github.event.client_payload.version }}"
 
             on_macos do
               if Hardware::CPU.arm?
@@ -85,11 +69,10 @@ jobs:
           end
           EOL
 
-      - name: Commit and push changes
+      - name: Commit and Push Changes
         run: |
-          cd homebrew-bastionbuddy
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git add Formula/bastionbuddy.rb
-          git commit -m "Update formula to version ${{ steps.release.outputs.version }}"
+          git commit -m "Update formula to version ${{ github.event.client_payload.version }}"
           git push
