@@ -41,28 +41,25 @@ jobs:
 
       - name: Generate changelog
         id: changelog
+        shell: bash
         run: |
-          # Get latest tag
-          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -A 1 ${{ env.VERSION }} | tail -n 1)
+          # Try to get the previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           
-          # Generate changelog
-          if [ "$PREVIOUS_TAG" != "" ]; then
-            changelog="Changes since $PREVIOUS_TAG:\n"
-            changelog+="$(git log --pretty=format:"* %s" $PREVIOUS_TAG..${{ env.VERSION }})"
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # No previous tag found - list all commits
+            CHANGELOG=$(echo -e "Initial release\n\nChangelog:\n$(git log --pretty=format:'* %s' --reverse)")
           else
-            changelog="Initial release"
+            # Get changes since the previous tag
+            CHANGELOG=$(echo -e "Changes since $PREVIOUS_TAG:\n$(git log --pretty=format:'* %s' $PREVIOUS_TAG..HEAD)")
           fi
-          
-          # Save changelog to output
-          echo "changelog<<CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
-          echo "$changelog" >> "$GITHUB_OUTPUT"
-          echo "CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+          echo "CHANGELOG=$CHANGELOG" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ env.VERSION }}
-          body: ${{ steps.changelog.outputs.changelog }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
           files: |
             builds/*.tar.gz
             builds/*.zip
