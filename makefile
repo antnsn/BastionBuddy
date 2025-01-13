@@ -1,4 +1,4 @@
-.PHONY: build clean test lint all release
+.PHONY: build clean test lint all release cleanup
 
 BINARY_NAME=bastionbuddy
 BUILD_DIR=builds
@@ -37,8 +37,11 @@ release: all
 		else \
 			tar czf $(BINARY_NAME)_$${GOOS}_$${GOARCH}.tar.gz -C $${GOOS}_$${GOARCH} $(BINARY_NAME) ; \
 		fi \
-	done && \
-	rm -rf darwin_* linux_* windows_*
+	done
+
+# Clean up build directories
+cleanup:
+	@cd $(BUILD_DIR) && rm -rf darwin_* linux_* windows_*
 
 clean:
 	rm -rf $(BUILD_DIR)
