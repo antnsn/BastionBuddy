@@ -71,6 +71,10 @@ jobs:
           recursive: true
           files: |
             *.exe
+          description: 'BastionBuddy - Azure Bastion Connection Utility'
+          timestamp-server: 'http://timestamp.digicert.com'
+          digest-algorithm: 'sha256'
+          additional-parameters: '/v /fd sha256 /tr http://timestamp.digicert.com /td sha256'
 
       - name: Upload signed executables
         uses: actions/upload-artifact@v3
