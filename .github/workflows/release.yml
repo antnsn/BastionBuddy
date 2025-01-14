@@ -61,23 +61,14 @@ jobs:
           name: windows-executables
           path: windows-executables
 
-      - name: Install Windows SDK
-        uses: microsoft/setup-msbuild@v1.3.1
-
-      - name: Import Code Signing Certificate
-        shell: pwsh
-        run: |
-          $certBytes = [Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE }}")
-          $certPath = Join-Path -Path $env:RUNNER_TEMP -ChildPath "certificate.pfx"
-          [IO.File]::WriteAllBytes($certPath, $certBytes)
-          
       - name: Sign Windows executables
-        shell: pwsh
-        run: |
-          $files = Get-ChildItem -Path "windows-executables" -Recurse -Filter "*.exe"
-          foreach ($file in $files) {
-              signtool sign /f "$env:RUNNER_TEMP\certificate.pfx" /tr http://timestamp.digicert.com /td sha256 /fd sha256 $file.FullName
-          }
+        uses: dlemstra/code-sign-action@v1
+        with:
+          certificate: '${{ secrets.WINDOWS_CERTIFICATE }}'
+          folder: 'windows-executables'
+          recursive: true
+          files: |
+            *.exe
 
       - name: Upload signed executables
         uses: actions/upload-artifact@v3
@@ -147,3 +138,14 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup build directories
+        run: make cleanup
+
+      - name: Notify Homebrew Tap
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          repository: antnsn/homebrew-bastionbuddy
+          event-type: update_formula
+          client-payload: '{"version": "${{ env.VERSION }}", "ref": "${{ github.sha }}"}'
