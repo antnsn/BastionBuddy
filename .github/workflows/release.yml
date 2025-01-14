@@ -44,7 +44,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path certificate
-          Set-Content -Path certificate/certificate.pfx -Value ${{ secrets.WINDOWS_CERTIFICATE }} -Encoding Byte
+          $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          [IO.File]::WriteAllBytes("certificate/certificate.pfx", $certBytes)
         env:
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
 
