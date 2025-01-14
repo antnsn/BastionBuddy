@@ -19,15 +19,11 @@ all:
 		echo "Building for $${GOOS}/$${GOARCH}..." ; \
 		mkdir -p $${OUTPUT_DIR} ; \
 		if [ "$${GOOS}" = "windows" ]; then \
-			GOOS=$${GOOS} GOARCH=$${GOARCH} go build -o $${OUTPUT_DIR}/$(BINARY_NAME).exe \
-				-ldflags="-X 'main.Version=$(VERSION)' -X 'github.com/antnsn/BastionBuddy/internal/welcome.Version=$(VERSION)' -H windowsgui" \
-				-ldflags="-linkmode external -extldflags '-static'" \
+			CGO_ENABLED=0 GOOS=$${GOOS} GOARCH=$${GOARCH} go build -o $${OUTPUT_DIR}/$(BINARY_NAME).exe \
+				-ldflags="-X 'main.Version=$(VERSION)' -X 'github.com/antnsn/BastionBuddy/internal/welcome.Version=$(VERSION)'" \
 				./cmd/azbastion ; \
-			if command -v mt.exe >/dev/null 2>&1; then \
-				mt.exe -manifest cmd/azbastion/app.manifest -outputresource:$${OUTPUT_DIR}/$(BINARY_NAME).exe\;1 ; \
-			fi \
 		else \
-			GOOS=$${GOOS} GOARCH=$${GOARCH} go build -o $${OUTPUT_DIR}/$(BINARY_NAME) \
+			CGO_ENABLED=0 GOOS=$${GOOS} GOARCH=$${GOARCH} go build -o $${OUTPUT_DIR}/$(BINARY_NAME) \
 				-ldflags="-X 'main.Version=$(VERSION)' -X 'github.com/antnsn/BastionBuddy/internal/welcome.Version=$(VERSION)'" \
 				./cmd/azbastion ; \
 		fi \
