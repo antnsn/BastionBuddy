@@ -33,7 +33,7 @@ func ShowWelcome() {
 	if _, err := magenta.Print("Version: "); err != nil {
 		fmt.Print("Version: ")
 	}
-	fmt.Println("1.0.0")
+	fmt.Println("1.0.2")
 
 	if _, err := magenta.Print("Description: "); err != nil {
 		fmt.Print("Description: ")
