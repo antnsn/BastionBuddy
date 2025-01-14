@@ -8,7 +8,7 @@ PLATFORMS=darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 window
 # Default build for current platform
 build:
 	mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(BINARY_NAME) -ldflags="-X 'main.Version=$(VERSION)'" ./cmd/azbastion
+	go build -o $(BUILD_DIR)/$(BINARY_NAME) -ldflags="-X 'main.Version=$(VERSION)' -X 'github.com/antnsn/BastionBuddy/internal/welcome.Version=$(VERSION)'" ./cmd/azbastion
 
 # Build for all supported platforms
 all:
@@ -19,9 +19,9 @@ all:
 		echo "Building for $${GOOS}/$${GOARCH}..." ; \
 		mkdir -p $${OUTPUT_DIR} ; \
 		if [ "$${GOOS}" = "windows" ]; then \
-			GOOS=$${GOOS} GOARCH=$${GOARCH} go build -o $${OUTPUT_DIR}/$(BINARY_NAME).exe -ldflags="-X 'main.Version=$(VERSION)'" ./cmd/azbastion ; \
+			GOOS=$${GOOS} GOARCH=$${GOARCH} go build -o $${OUTPUT_DIR}/$(BINARY_NAME).exe -ldflags="-X 'main.Version=$(VERSION)' -X 'github.com/antnsn/BastionBuddy/internal/welcome.Version=$(VERSION)'" ./cmd/azbastion ; \
 		else \
-			GOOS=$${GOOS} GOARCH=$${GOARCH} go build -o $${OUTPUT_DIR}/$(BINARY_NAME) -ldflags="-X 'main.Version=$(VERSION)'" ./cmd/azbastion ; \
+			GOOS=$${GOOS} GOARCH=$${GOARCH} go build -o $${OUTPUT_DIR}/$(BINARY_NAME) -ldflags="-X 'main.Version=$(VERSION)' -X 'github.com/antnsn/BastionBuddy/internal/welcome.Version=$(VERSION)'" ./cmd/azbastion ; \
 		fi \
 	done
 

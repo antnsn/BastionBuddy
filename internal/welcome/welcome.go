@@ -10,6 +10,10 @@ import (
 )
 
 var (
+	// Version holds the current version of BastionBuddy
+	// This will be set during build time using ldflags
+	Version = "dev"
+
 	cyan    = color.New(color.FgCyan)
 	magenta = color.New(color.FgMagenta)
 	yellow  = color.New(color.FgYellow)
@@ -33,7 +37,7 @@ func ShowWelcome() {
 	if _, err := magenta.Print("Version: "); err != nil {
 		fmt.Print("Version: ")
 	}
-	fmt.Println("1.0.2")
+	fmt.Println(Version)
 
 	if _, err := magenta.Print("Description: "); err != nil {
 		fmt.Print("Description: ")
