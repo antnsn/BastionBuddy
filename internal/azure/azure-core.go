@@ -185,7 +185,7 @@ func connectSSH(config *ResourceConfig) error {
 
 func connectTunnel(config *ResourceConfig) error {
 	if config.RemotePort == 0 {
-		remotePort, err := utils.ReadInput("Enter the resource port (default 22)")
+		remotePort, err := utils.ReadInput("Enter the resource port (default 22 for SSH, 3389 for RDP)")
 		if err != nil {
 			return fmt.Errorf("failed to read remote port: %v", err)
 		}
