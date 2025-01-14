@@ -74,7 +74,9 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: signed-windows-executables
-          path: windows-executables/*.exe
+          path: |
+            windows-executables/windows_amd64/*.exe
+            windows-executables/windows_arm64/*.exe
 
   create-release:
     needs: [build, sign-windows]
