@@ -165,10 +165,9 @@ func connectSSH(config *ResourceConfig) error {
 	}
 
 	fmt.Println("Connecting via SSH...")
-	// TODO: Implement SSH connection using Azure SDK
-	// For now, use the existing CLI command
 	args := []string{
 		"network", "bastion", "ssh",
+		"--subscription", subID,
 		"--name", config.BastionHost.Name,
 		"--resource-group", config.BastionHost.ResourceGroup,
 		"--target-resource-id", config.TargetResource.ID,
@@ -207,11 +206,10 @@ func connectTunnel(config *ResourceConfig) error {
 		}
 	}
 
-	fmt.Println("Establishing tunnel...")
-	// TODO: Implement tunnel connection using Azure SDK
-	// For now, use the existing CLI command
+	fmt.Printf("Creating tunnel from localhost:%d to remote port %d...\n", config.LocalPort, config.RemotePort)
 	args := []string{
 		"network", "bastion", "tunnel",
+		"--subscription", subID,
 		"--name", config.BastionHost.Name,
 		"--resource-group", config.BastionHost.ResourceGroup,
 		"--target-resource-id", config.TargetResource.ID,
@@ -223,6 +221,5 @@ func connectTunnel(config *ResourceConfig) error {
 		return fmt.Errorf("failed to establish tunnel: %v", err)
 	}
 
-	fmt.Printf("Tunnel established! You can now connect to localhost:%d\n", config.LocalPort)
 	return nil
 }
