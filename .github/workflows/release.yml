@@ -122,11 +122,7 @@ jobs:
       - name: Prepare release files
         run: |
           cd artifacts
-          # Move Windows executables to their proper location
-          mkdir -p windows_amd64 windows_arm64
-          mv windows_amd64/bastionbuddy.exe bastionbuddy_windows_amd64.exe || true
-          mv windows_arm64/bastionbuddy.exe bastionbuddy_windows_arm64.exe || true
-          # Create final archives
+          # Create archives for non-Windows platforms
           for os in darwin linux; do
             for arch in amd64 arm64; do
               if [ -f ${os}_${arch}/bastionbuddy ]; then
@@ -134,12 +130,22 @@ jobs:
               fi
             done
           done
-          # Create Windows archives
+          
+          # Handle Windows executables - keep original name bastionbuddy.exe
           for arch in amd64 arm64; do
-            if [ -f bastionbuddy_windows_${arch}.exe ]; then
-              zip bastionbuddy_windows_${arch}.zip bastionbuddy_windows_${arch}.exe
+            if [ -f windows_${arch}/bastionbuddy.exe ]; then
+              # Create a temporary directory for each architecture
+              mkdir -p tmp_windows_${arch}
+              cp windows_${arch}/bastionbuddy.exe tmp_windows_${arch}/bastionbuddy.exe
+              # Create zip from the temp directory
+              (cd tmp_windows_${arch} && zip ../bastionbuddy_windows_${arch}.zip bastionbuddy.exe)
+              rm -rf tmp_windows_${arch}
             fi
           done
+          
+          # List all created archives
+          echo "Created archives:"
+          ls -la bastionbuddy_*
 
       - name: Generate changelog
         id: changelog

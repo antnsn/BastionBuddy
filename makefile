@@ -45,7 +45,9 @@ release: all
 
 # Clean up build directories
 cleanup:
-	@cd $(BUILD_DIR) && rm -rf darwin_* linux_* windows_*
+	@if [ -d "$(BUILD_DIR)" ]; then \
+		cd $(BUILD_DIR) && rm -rf darwin_* linux_* windows_* *.zip *.tar.gz; \
+	fi
 
 clean:
 	rm -rf $(BUILD_DIR)
