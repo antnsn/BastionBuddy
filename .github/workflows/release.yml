@@ -71,8 +71,9 @@ jobs:
           path: windows-executables
 
       - name: List files
+        shell: cmd
         run: |
-          dir /s windows-executables
+          dir /s /b windows-executables
 
       - name: Sign Windows executables
         uses: dlemstra/code-sign-action@v1
