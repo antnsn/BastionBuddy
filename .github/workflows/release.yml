@@ -103,22 +103,38 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: all-artifacts
-          path: builds
+          path: artifacts
 
       - name: Download signed Windows executables
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: signed-windows-executables
-          path: signed-windows
+          path: artifacts
 
-      - name: Replace unsigned executables with signed ones
+      - name: Prepare release files
         run: |
-          mkdir -p builds/windows_amd64 builds/windows_arm64
-          find signed-windows -name "*.exe" -exec cp {} builds/windows_amd64/ \;
-          find signed-windows -name "*.exe" -exec cp {} builds/windows_arm64/ \;
+          cd artifacts
+          # Move Windows executables to their proper location
+          mkdir -p windows_amd64 windows_arm64
+          mv windows_amd64/bastionbuddy.exe bastionbuddy_windows_amd64.exe || true
+          mv windows_arm64/bastionbuddy.exe bastionbuddy_windows_arm64.exe || true
+          # Create final archives
+          for os in darwin linux; do
+            for arch in amd64 arm64; do
+              if [ -f ${os}_${arch}/bastionbuddy ]; then
+                tar czf bastionbuddy_${os}_${arch}.tar.gz -C ${os}_${arch} bastionbuddy
+              fi
+            done
+          done
+          # Create Windows archives
+          for arch in amd64 arm64; do
+            if [ -f bastionbuddy_windows_${arch}.exe ]; then
+              zip bastionbuddy_windows_${arch}.zip bastionbuddy_windows_${arch}.exe
+            fi
+          done
 
       - name: Generate changelog
         id: changelog
@@ -148,9 +164,10 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           name: BastionBuddy ${{ env.VERSION }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
           files: |
-            bastionbuddy_*.zip
-            bastionbuddy_*.tar.gz
+            artifacts/bastionbuddy_*.zip
+            artifacts/bastionbuddy_*.tar.gz
           draft: false
           prerelease: false
           generate_release_notes: true
