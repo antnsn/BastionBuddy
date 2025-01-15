@@ -2,7 +2,7 @@
 
 BINARY_NAME=bastionbuddy
 BUILD_DIR=builds
-VERSION=$(shell git describe --tags --always --dirty)
+VERSION?=$(shell git describe --tags --always --dirty)
 PLATFORMS=darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64
 
 # Default build for current platform
