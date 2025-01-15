@@ -47,7 +47,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-executables
-          path: builds/*windows*/bastionbuddy.exe
+          path: |
+            builds/windows_amd64/bastionbuddy.exe
+            builds/windows_arm64/bastionbuddy.exe
 
       - name: Upload all artifacts
         uses: actions/upload-artifact@v4
@@ -63,10 +65,14 @@ jobs:
       contents: write
     steps:
       - name: Download Windows executables
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: windows-executables
           path: windows-executables
+
+      - name: List files
+        run: |
+          dir /s windows-executables
 
       - name: Sign Windows executables
         uses: dlemstra/code-sign-action@v1
@@ -79,12 +85,10 @@ jobs:
           description: 'BastionBuddy - Azure Bastion Connection Utility'
 
       - name: Upload signed executables
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: signed-windows-executables
-          path: |
-            windows-executables/windows_amd64/*.exe
-            windows-executables/windows_arm64/*.exe
+          path: windows-executables/**/*.exe
 
   create-release:
     needs: [build, sign-windows]
