@@ -1,6 +1,5 @@
-// Package main provides the entry point for the BastionBuddy CLI tool,
-// which facilitates SSH connections and tunneling to Azure virtual machines
-// through Azure Bastion.
+// Package main is the entry point for BastionBuddy, a friendly command-line utility
+// that makes Azure Bastion connections easy and interactive.
 package main
 
 import (
@@ -9,46 +8,93 @@ import (
 
 	"github.com/antnsn/BastionBuddy/internal/azure"
 	"github.com/antnsn/BastionBuddy/internal/welcome"
-	"github.com/spf13/cobra"
 )
 
+// Version is the current version of BastionBuddy, set at build time.
+var Version string
+
 func main() {
-	rootCmd := &cobra.Command{
-		Use:   "bastionbuddy",
-		Short: "Azure Bastion Connection Utility",
-		Long:  "A utility for managing connections to Azure VMs through Azure Bastion",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			welcome.ShowWelcome()
-
-			if err := azure.CheckDependencies(); err != nil {
-				return fmt.Errorf("dependency check failed: %v", err)
+	// Check for command line arguments
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--tunnel":
+			if len(os.Args) < 3 {
+				fmt.Println("Error: Please specify a tunnel name")
+				os.Exit(1)
 			}
-			defer func() {
-				if err := azure.Cleanup(); err != nil {
-					fmt.Fprintf(os.Stderr, "Error during cleanup: %v\n", err)
-				}
-			}()
-
-			config, err := azure.GetAzureResources()
-			if err != nil {
-				return fmt.Errorf("failed to get Azure resources: %v", err)
+			tunnelName := os.Args[2]
+			if err := azure.StartSavedTunnel(tunnelName); err != nil {
+				fmt.Printf("Error starting tunnel: %v\n", err)
+				os.Exit(1)
 			}
-
-			connectionType, err := azure.SelectConnectionType()
-			if err != nil {
-				return fmt.Errorf("failed to select connection type: %v", err)
+			os.Exit(0)
+		case "--ssh":
+			if len(os.Args) < 3 {
+				fmt.Println("Error: Please specify a saved configuration name")
+				os.Exit(1)
 			}
-
-			if err := azure.Connect(connectionType, config); err != nil {
-				return fmt.Errorf("failed to establish connection: %v", err)
+			configName := os.Args[2]
+			if err := azure.StartSavedSSH(configName); err != nil {
+				fmt.Printf("Error starting SSH: %v\n", err)
+				os.Exit(1)
 			}
-
-			return nil
-		},
+			os.Exit(0)
+		case "--rdp":
+			if len(os.Args) < 3 {
+				fmt.Println("Error: Please specify a saved configuration name")
+				os.Exit(1)
+			}
+			configName := os.Args[2]
+			if err := azure.StartSavedRDP(configName); err != nil {
+				fmt.Printf("Error starting RDP: %v\n", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		case "--list":
+			var connectionType string
+			if len(os.Args) > 2 {
+				connectionType = os.Args[2]
+			}
+			if err := azure.ListConfigurations(connectionType); err != nil {
+				fmt.Printf("Error listing configurations: %v\n", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		}
 	}
 
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	welcome.ShowWelcome()
+
+	if err := azure.CheckDependencies(); err != nil {
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
+	}
+
+	defer func() {
+		if err := azure.Cleanup(); err != nil {
+			fmt.Printf("Error during cleanup: %v\n", err)
+		}
+	}()
+
+	for {
+		fmt.Println()
+		action, err := azure.SelectInitialAction()
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			continue
+		}
+
+		if action == "exit" {
+			break
+		}
+
+		if err := azure.InitiateAction(action, nil); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			continue
+		}
+
+		// Show welcome screen again with updated tunnel status
+		fmt.Print("\033[H\033[2J") // Clear screen
+		welcome.ShowWelcome()
 	}
 }

@@ -97,3 +97,20 @@ func CheckDependencies() error {
 	}
 	return nil
 }
+
+// GetUserInputInt prompts the user for an integer input with the given prompt text.
+// It returns the user's input as an integer and any error that occurred.
+func GetUserInputInt(prompt string) (int, error) {
+	input, err := ReadInput(prompt)
+	if err != nil {
+		return 0, err
+	}
+
+	var result int
+	_, err = fmt.Sscanf(input, "%d", &result)
+	if err != nil {
+		return 0, fmt.Errorf("invalid integer input: %v", err)
+	}
+
+	return result, nil
+}

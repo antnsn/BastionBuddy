@@ -5,7 +5,9 @@ package welcome
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/antnsn/BastionBuddy/internal/azure"
 	"github.com/fatih/color"
 )
 
@@ -17,6 +19,7 @@ var (
 	cyan    = color.New(color.FgCyan)
 	magenta = color.New(color.FgMagenta)
 	yellow  = color.New(color.FgYellow)
+	green   = color.New(color.FgGreen)
 )
 
 // ShowWelcome displays the welcome screen with the application logo,
@@ -49,10 +52,9 @@ func ShowWelcome() {
 		fmt.Println("✨ Features:")
 	}
 	fmt.Println("• Interactive menu-driven interface")
-	fmt.Println("• Support for both SSH and Port Tunneling")
+	fmt.Println("• Support for SSH, RDP, and Port Tunneling")
 	fmt.Println("• Automatic Azure resource discovery")
-	fmt.Println("• Smart caching for faster subsequent connections")
-	fmt.Println("• Colorful and intuitive UI")
+	fmt.Println("• Kill active tunnels with ease")
 
 	fmt.Println()
 	if _, err := yellow.Println("🚀 Usage Tips:"); err != nil {
@@ -62,8 +64,43 @@ func ShowWelcome() {
 	fmt.Println("• Type to search in lists")
 	fmt.Println("• Press Enter to select")
 	fmt.Println("• Use Ctrl+C to exit at any time")
+	fmt.Println("• Select 'Manage Tunnels' to manage tunnel connections")
 
 	printSeparator()
+	showActiveTunnels() // Show active tunnels at the bottom of the welcome screen
+	printSeparator()
+}
+
+func showActiveTunnels() {
+	manager, err := azure.GetTunnelManager()
+	if err != nil {
+		fmt.Printf("Warning: failed to get tunnel manager: %v\n", err)
+		return
+	}
+
+	tunnels := manager.ListTunnels()
+	if len(tunnels) == 0 {
+		return
+	}
+
+	if _, err := yellow.Println("🔌 Active Tunnels:"); err != nil {
+		fmt.Println("🔌 Active Tunnels:")
+	}
+
+	for _, t := range tunnels {
+		status := "Running"
+		if t.Status == "restored" {
+			status = "Restored"
+		}
+
+		if _, err := green.Printf("• %s (Local:%d → Remote:%d) - Resource: %s [%s: %s]\n",
+			t.ID[:8], t.LocalPort, t.RemotePort, t.ResourceName,
+			status, time.Since(t.StartTime).Round(time.Second)); err != nil {
+			fmt.Printf("• %s (Local:%d → Remote:%d) - Resource: %s [%s: %s]\n",
+				t.ID[:8], t.LocalPort, t.RemotePort, t.ResourceName,
+				status, time.Since(t.StartTime).Round(time.Second))
+		}
+	}
 }
 
 func printSeparator() {
