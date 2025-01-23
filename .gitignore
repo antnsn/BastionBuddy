@@ -22,3 +22,4 @@ go.work
 /builds
 /bin
 bastion.sh
+.DS_Store
