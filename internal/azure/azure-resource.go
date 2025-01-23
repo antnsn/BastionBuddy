@@ -8,17 +8,12 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/antnsn/BastionBuddy/internal/config"
 	"github.com/antnsn/BastionBuddy/internal/utils"
 )
 
-// TargetResource represents an Azure resource that will be connected to.
-type TargetResource struct {
-	ID string
-}
-
-// GetTargetResource retrieves the target resource details either through
-// manual input or by selecting from available resources.
-func GetTargetResource(ctx context.Context, subID string, cred *azidentity.DefaultAzureCredential) (*TargetResource, error) {
+// GetTargetResource prompts the user to select a target resource.
+func GetTargetResource(ctx context.Context, cred *azidentity.DefaultAzureCredential, subscriptionID string) (*config.TargetResource, error) {
 	selectionMethod, err := utils.SelectWithMenu([]string{"select-resource", "manual-input"}, "How would you like to specify the target resource?")
 	if err != nil {
 		if strings.Contains(err.Error(), "cancelled by user") {
@@ -30,7 +25,7 @@ func GetTargetResource(ctx context.Context, subID string, cred *azidentity.Defau
 
 	switch selectionMethod {
 	case "select-resource":
-		return getResourceSelection(ctx, subID, cred)
+		return getResourceSelection(ctx, cred, subscriptionID)
 	case "manual-input":
 		return getResourceManualInput()
 	default:
@@ -39,7 +34,7 @@ func GetTargetResource(ctx context.Context, subID string, cred *azidentity.Defau
 }
 
 // getResourceManualInput prompts the user to manually input resource details.
-func getResourceManualInput() (*TargetResource, error) {
+func getResourceManualInput() (*config.TargetResource, error) {
 	resourceID, err := utils.ReadInput("Enter resource ID")
 	if err != nil {
 		if strings.Contains(err.Error(), "cancelled by user") {
@@ -48,107 +43,92 @@ func getResourceManualInput() (*TargetResource, error) {
 		}
 		return nil, fmt.Errorf("failed to read resource ID: %v", err)
 	}
-	if resourceID == "" {
-		return nil, fmt.Errorf("resource ID cannot be empty")
-	}
 
-	return &TargetResource{
+	return &config.TargetResource{
 		ID: resourceID,
 	}, nil
 }
 
 // getResourceSelection retrieves available virtual machines and lets the user select one.
-func getResourceSelection(ctx context.Context, subID string, cred *azidentity.DefaultAzureCredential) (*TargetResource, error) {
-	fmt.Println("Fetching virtual machines...")
+func getResourceSelection(ctx context.Context, cred *azidentity.DefaultAzureCredential, subscriptionID string) (*config.TargetResource, error) {
+	debugPrintf("Fetching virtual machines from subscription: %s...\n", subscriptionID)
 
-	// Create resources client
-	resourceClient, err := armresources.NewClient(subID, cred, nil)
+	client, err := armresources.NewClient(subscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resources client: %v", err)
 	}
 
-	// List all virtual machines using resource client
 	filter := "resourceType eq 'Microsoft.Compute/virtualMachines'"
-	fmt.Printf("Using filter: %s\n", filter)
-	pager := resourceClient.NewListPager(&armresources.ClientListOptions{
+	debugPrintf("Using filter: %s\n", filter)
+
+	var resources []*armresources.GenericResourceExpanded
+	pageNum := 1
+
+	pager := client.NewListPager(&armresources.ClientListOptions{
 		Filter: &filter,
 	})
 
-	var items []string
-	resourceMap := make(map[string]string) // Map of "name (resourceGroup)" -> resourceID
-	pageCount := 0
 	for pager.More() {
-		pageCount++
-		fmt.Printf("Fetching page %d...\n", pageCount)
+		debugPrintf("Fetching page %d...\n", pageNum)
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list virtual machines: %v", err)
+			return nil, fmt.Errorf("failed to get resources page: %v", err)
 		}
-
-		fmt.Printf("Found %d resources on page %d\n", len(page.Value), pageCount)
-		for _, resource := range page.Value {
-			if resource.Name == nil {
-				fmt.Println("Found resource with nil name, skipping")
-				continue
-			}
-
-			fmt.Printf("Found resource: Name=%s, Type=%s, ID=%s\n", *resource.Name, *resource.Type, *resource.ID)
-
-			// Extract resource group from ID
-			parts := strings.Split(*resource.ID, "/")
-			var resourceGroup string
-			for i, part := range parts {
-				if strings.EqualFold(part, "resourceGroups") && i+1 < len(parts) {
-					resourceGroup = parts[i+1]
-					break
-				}
-			}
-			if resourceGroup == "" {
-				fmt.Printf("Could not extract resource group from ID: %s\n", *resource.ID)
-				continue
-			}
-
-			key := fmt.Sprintf("%s (%s)", *resource.Name, resourceGroup)
-			items = append(items, key)
-			resourceMap[key] = *resource.ID
+		debugPrintf("Found %d resources on page %d\n", len(page.Value), pageNum)
+		for _, res := range page.Value {
+			debugPrintf("Found resource: Name=%s, Type=%s, ID=%s\n",
+				*res.Name,
+				*res.Type,
+				*res.ID)
 		}
+		resources = append(resources, page.Value...)
+		pageNum++
 	}
 
-	if len(items) == 0 {
-		// Try listing without filter to see what resources are available
-		fmt.Println("No virtual machines found, listing all resources to debug...")
-		pager = resourceClient.NewListPager(nil)
-		for pager.More() {
-			page, err := pager.NextPage(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to list resources: %v", err)
-			}
-			for _, resource := range page.Value {
-				if resource.Type != nil && resource.Name != nil {
-					fmt.Printf("Available resource: Type=%s, Name=%s\n", *resource.Type, *resource.Name)
-				}
-			}
-		}
-		return nil, fmt.Errorf("no virtual machines found in subscription %s", subID)
+	if len(resources) == 0 {
+		return nil, fmt.Errorf("no virtual machines found in subscription")
 	}
 
-	// Let user select a virtual machine
-	selected, err := utils.SelectWithMenu(items, "Select virtual machine:")
+	var items []string
+	resourceMap := make(map[string]*armresources.GenericResourceExpanded)
+
+	for _, res := range resources {
+		if res.Name == nil || res.ID == nil {
+			continue
+		}
+
+		// Extract resource group from ID
+		parts := strings.Split(*res.ID, "/")
+		var resourceGroup string
+		for i, part := range parts {
+			if strings.EqualFold(part, "resourceGroups") && i+1 < len(parts) {
+				resourceGroup = parts[i+1]
+				break
+			}
+		}
+
+		// Include name, resource group, and location in the display
+		item := fmt.Sprintf("%s | Group: %s | Region: %s",
+			*res.Name,
+			resourceGroup,
+			*res.Location)
+		items = append(items, item)
+		resourceMap[item] = res
+	}
+
+	selected, err := utils.SelectWithMenu(items, "Select virtual machine (type to filter)")
 	if err != nil {
 		if strings.Contains(err.Error(), "cancelled by user") {
 			fmt.Println("\nOperation cancelled by user")
 			os.Exit(0)
 		}
-		return nil, fmt.Errorf("failed to select virtual machine: %v", err)
+		return nil, fmt.Errorf("failed to select resource: %v", err)
 	}
 
-	// Look up the resource ID from our map
-	resourceID, ok := resourceMap[selected]
-	if !ok {
-		return nil, fmt.Errorf("could not find resource ID for selection: %s", selected)
-	}
-
-	return &TargetResource{
-		ID: resourceID,
+	selectedResource := resourceMap[selected]
+	return &config.TargetResource{
+		ID:   *selectedResource.ID,
+		Name: *selectedResource.Name,
+		Type: "Microsoft.Compute/virtualMachines",
 	}, nil
 }

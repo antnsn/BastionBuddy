@@ -13,6 +13,9 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
+// ErrReturnToMain is returned when the user presses escape to return to the main menu
+var ErrReturnToMain = errors.New("return to main menu")
+
 // SelectWithMenu presents an interactive menu to the user with the given items and prompt.
 // It returns the selected item and any error that occurred.
 func SelectWithMenu(items []string, prompt string) (string, error) {
@@ -38,7 +41,10 @@ func SelectWithMenu(items []string, prompt string) (string, error) {
 	}
 
 	_, result, err := selector.Run()
-	if err == promptui.ErrInterrupt || err == promptui.ErrEOF {
+	if err == promptui.ErrInterrupt {
+		return "", ErrReturnToMain
+	}
+	if err == promptui.ErrEOF {
 		return "", errors.New("selection cancelled by user")
 	}
 	return result, err
@@ -96,4 +102,21 @@ func CheckDependencies() error {
 		return fmt.Errorf("Azure CLI (az) is not installed. Please install it from https://docs.microsoft.com/cli/azure/install-azure-cli")
 	}
 	return nil
+}
+
+// GetUserInputInt prompts the user for an integer input with the given prompt text.
+// It returns the user's input as an integer and any error that occurred.
+func GetUserInputInt(prompt string) (int, error) {
+	input, err := ReadInput(prompt)
+	if err != nil {
+		return 0, err
+	}
+
+	var result int
+	_, err = fmt.Sscanf(input, "%d", &result)
+	if err != nil {
+		return 0, fmt.Errorf("invalid integer input: %v", err)
+	}
+
+	return result, nil
 }
