@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"time"
 
@@ -101,14 +102,21 @@ func (tm *TunnelManager) StopAllTunnels() error {
 
 // stopTunnelProcess stops the process associated with a tunnel
 func (tm *TunnelManager) stopTunnelProcess(tunnel *TunnelInfo) error {
-	fmt.Printf("Stopping tunnel process for ID: %s\n", tunnel.ID)
-	if tunnel.cmd != nil && tunnel.cmd.Process != nil {
-		if err := tunnel.cmd.Process.Kill(); err != nil {
-			fmt.Printf("Failed to kill tunnel process for ID %s: %v\n", tunnel.ID, err)
-			return fmt.Errorf("failed to kill tunnel process: %v", err)
-		}
-		fmt.Printf("Successfully killed tunnel process for ID: %s\n", tunnel.ID)
+	if tunnel.PID == 0 {
+		fmt.Printf("No PID found for tunnel ID: %s\n", tunnel.ID)
+		return fmt.Errorf("no PID found for tunnel ID: %s", tunnel.ID)
 	}
+
+	fmt.Printf("Attempting to stop tunnel process with PID: %d\n", tunnel.PID)
+
+	// Create a dummy exec.Cmd with the PID to use with KillProcessGroup
+	cmd := &exec.Cmd{Process: &os.Process{Pid: tunnel.PID}}
+	if err := utils.KillProcessGroup(cmd); err != nil {
+		fmt.Printf("Warning: failed to stop tunnel process: %v\n", err)
+		return fmt.Errorf("failed to stop tunnel process: %v", err)
+	}
+
+	fmt.Printf("Tunnel process stopped successfully\n")
 	return nil
 }
 
@@ -155,6 +163,7 @@ func (tm *TunnelManager) StartTunnel(subscriptionID string, resourceID string, r
 	}
 
 	// Store the PID
+	tunnel.cmd = cmd
 	tunnel.PID = cmd.Process.Pid
 
 	// Save the tunnel info
@@ -173,7 +182,7 @@ func (tm *TunnelManager) StartTunnel(subscriptionID string, resourceID string, r
 	if err != nil {
 		tunnel.Status = "failed"
 		output := outputBuffer.String()
-		if err := cmd.Process.Kill(); err != nil {
+		if err := utils.KillProcessGroup(tunnel.cmd); err != nil {
 			fmt.Printf("Warning: failed to kill tunnel process: %v\n", err)
 		}
 		return nil, fmt.Errorf("tunnel port %d is not listening after startup: %v\nOutput: %s", localPort, err, output)
@@ -202,7 +211,7 @@ func (tm *TunnelManager) StartTunnel(subscriptionID string, resourceID string, r
 		BastionResourceGroup:  bastionResourceGroup,
 		BastionSubscriptionID: bastionSubscriptionID,
 		StartTime:             time.Now(),
-		Status:                "active",
+		Status:                "running",
 		PID:                   tunnel.PID, // Include PID
 	}
 	if err := tm.configMgr.SaveActive(*activeTunnel); err != nil {

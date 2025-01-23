@@ -108,17 +108,29 @@ func (m *Manager) GetSavedConfigsByType(connectionType string) []Config {
 
 // SaveActive saves information about a currently active tunnel
 func (m *Manager) SaveActive(tunnel Active) error {
+	// First remove any existing tunnel with the same ID
+	for i, t := range m.active {
+		if t.ID == tunnel.ID {
+			m.active = append(m.active[:i], m.active[i+1:]...)
+			break
+		}
+	}
+	// Then append the new tunnel
 	m.active = append(m.active, tunnel)
 	return m.save()
 }
 
 // RemoveActive removes a tunnel from the active tunnels list
 func (m *Manager) RemoveActive(id string) error {
-	for i, t := range m.active {
-		if t.ID == id {
-			m.active = append(m.active[:i], m.active[i+1:]...)
-			return m.save()
+	newActive := make([]Active, 0, len(m.active))
+	for _, t := range m.active {
+		if t.ID != id {
+			newActive = append(newActive, t)
 		}
+	}
+	if len(newActive) != len(m.active) {
+		m.active = newActive
+		return m.save()
 	}
 	return nil
 }

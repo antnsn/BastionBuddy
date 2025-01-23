@@ -272,7 +272,7 @@ func InitiateConnection() error {
 				Username:              config.Username,
 			}
 
-			if err := StartTunnel(config, tunnelConfig); err != nil {
+			if _, err := StartTunnel(config, tunnelConfig); err != nil {
 				return fmt.Errorf("failed to start tunnel: %v", err)
 			}
 
@@ -329,7 +329,7 @@ func establishConnection(connectionType ConnectionType, config *config.ResourceC
 			ConnectionType:        "tunnel",
 			Username:              config.Username,
 		}
-		if err := StartTunnel(config, tunnelConfig); err != nil {
+		if _, err := StartTunnel(config, tunnelConfig); err != nil {
 			return err
 		}
 	case RDP:

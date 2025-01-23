@@ -104,6 +104,27 @@ The interactive menu will guide you through:
 - Press Enter to select
 - Use Ctrl+C to exit at any time
 
+### Tips for Port Tunnels
+
+When using port tunnels with SSH, you can avoid host key verification issues by using the following SSH command:
+```bash
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no username@localhost -p <local_port>
+```
+
+This approach:
+- Bypasses host key verification for localhost connections
+- Prevents conflicts when connecting to different hosts through the same local port
+- Makes it easier to use tools that rely on SSH connections
+
+Example:
+```bash
+# Start a tunnel to remote port 22 on local port 50021
+bastionbuddy tunnel
+
+# Connect using SSH through the tunnel
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no sysadmin@localhost -p 50021
+```
+
 ## Configuration Files
 
 BastionBuddy stores your connection configurations in JSON files in the following locations:
@@ -146,6 +167,10 @@ Additional parameters for tunnels:
 - `local_port`: Local port to forward from
 - `remote_port`: Remote port to forward to
 - `connection_type`: Type of connection ("tunnel")
+- `id`: Unique identifier for active tunnels
+- `pid`: Process ID of the running tunnel
+- `status`: Current status of the tunnel ("running")
+- `start_time`: When the tunnel was started
 
 ## Commands
 
@@ -179,6 +204,27 @@ bastionbuddy tunnel stop <tunnel-id>   # Stop a running tunnel
 ```
 
 When using any command without parameters, BastionBuddy will guide you through an interactive menu to select resources and configure the connection. Your configurations are automatically saved for future use.
+
+### Managing Active Tunnels
+
+To view and manage active tunnels:
+```bash
+bastionbuddy
+# Select "Manage active tunnels" from the menu
+```
+
+Active tunnels are tracked in `active.json` with the following information:
+- Tunnel ID
+- Local and remote ports
+- Resource details
+- Process ID (PID)
+- Status (running)
+
+You can stop a tunnel either by:
+1. Using the interactive menu and selecting "Terminate"
+2. Using the command line: `bastionbuddy tunnel stop <tunnel-id>`
+
+The tunnel process will be properly terminated and removed from the active tunnels list.
 
 ### Example Usage
 

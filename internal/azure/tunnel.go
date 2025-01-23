@@ -9,9 +9,9 @@ import (
 )
 
 // StartTunnel starts a new tunnel with the given configuration
-func StartTunnel(resourceConfig *config.ResourceConfig, tunnelConfig *tunnels.Config) error {
+func StartTunnel(resourceConfig *config.ResourceConfig, tunnelConfig *tunnels.Config) (*TunnelInfo, error) {
 	if err := ensureAuthenticated(); err != nil {
-		return fmt.Errorf("failed to authenticate: %v", err)
+		return nil, fmt.Errorf("failed to authenticate: %v", err)
 	}
 
 	// If no tunnel config is provided, create one from the resource config
@@ -38,16 +38,16 @@ func StartTunnel(resourceConfig *config.ResourceConfig, tunnelConfig *tunnels.Co
 	// Get the tunnel manager
 	manager, err := GetTunnelManager()
 	if err != nil {
-		return fmt.Errorf("failed to get tunnel manager: %v", err)
+		return nil, fmt.Errorf("failed to get tunnel manager: %v", err)
 	}
 
 	// Save the configuration for future use
 	if err := manager.configMgr.SaveConfig(*tunnelConfig); err != nil {
-		return fmt.Errorf("failed to save tunnel configuration: %v", err)
+		return nil, fmt.Errorf("failed to save tunnel configuration: %v", err)
 	}
 
 	// Start the tunnel
-	_, err = manager.StartTunnel(
+	tunnelInfo, err := manager.StartTunnel(
 		tunnelConfig.SubscriptionID,
 		tunnelConfig.ResourceID,
 		tunnelConfig.ResourceName,
@@ -57,18 +57,18 @@ func StartTunnel(resourceConfig *config.ResourceConfig, tunnelConfig *tunnels.Co
 		tunnelConfig.BastionResourceGroup,
 		tunnelConfig.BastionSubscriptionID,
 	)
-	return err
+	return tunnelInfo, err
 }
 
 // StartSavedTunnel starts a tunnel using a saved configuration
-func StartSavedTunnel(tunnelName string) error {
+func StartSavedTunnel(tunnelName string) (*TunnelInfo, error) {
 	if err := ensureAuthenticated(); err != nil {
-		return fmt.Errorf("failed to authenticate: %v", err)
+		return nil, fmt.Errorf("failed to authenticate: %v", err)
 	}
 
 	manager, err := GetTunnelManager()
 	if err != nil {
-		return fmt.Errorf("failed to get tunnel manager: %v", err)
+		return nil, fmt.Errorf("failed to get tunnel manager: %v", err)
 	}
 
 	// Get all saved configurations
@@ -84,11 +84,16 @@ func StartSavedTunnel(tunnelName string) error {
 	}
 
 	if tunnelConfig == nil {
-		return fmt.Errorf("tunnel configuration '%s' not found", tunnelName)
+		return nil, fmt.Errorf("tunnel configuration '%s' not found", tunnelName)
 	}
 
 	// Start the tunnel with the saved configuration
-	return StartTunnel(nil, tunnelConfig)
+	tunnelInfo, err := StartTunnel(nil, tunnelConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return tunnelInfo, nil
 }
 
 // StartSavedSSH starts an SSH connection using a saved configuration

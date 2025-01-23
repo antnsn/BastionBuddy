@@ -125,8 +125,8 @@ func showActiveTunnels() {
 
 	for _, t := range tunnels {
 		status := "Running"
-		if t.Status == "restored" {
-			status = "Restored"
+		if t.Status != "running" {
+			status = "Unknown"
 		}
 
 		if _, err := green.Printf("• %s (Local:%d → Remote:%d) - Resource: %s [%s: %s]\n",

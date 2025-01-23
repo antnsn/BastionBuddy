@@ -96,14 +96,18 @@ func initializeTunnelManager() error {
 	activeTunnels := configMgr.GetActive()
 	for _, t := range activeTunnels {
 		tunnel := &TunnelInfo{
-			ID:             t.ID,
-			LocalPort:      t.LocalPort,
-			RemotePort:     t.RemotePort,
-			ResourceID:     t.ResourceID,
-			ResourceName:   t.ResourceName,
-			SubscriptionID: t.SubscriptionID,
-			StartTime:      t.StartTime,
-			Status:         "active", // Mark as active without reconnecting
+			ID:                    t.ID,
+			LocalPort:             t.LocalPort,
+			RemotePort:            t.RemotePort,
+			ResourceID:            t.ResourceID,
+			ResourceName:          t.ResourceName,
+			SubscriptionID:        t.SubscriptionID,
+			BastionName:           t.BastionName,
+			BastionResourceGroup:  t.BastionResourceGroup,
+			BastionSubscriptionID: t.BastionSubscriptionID,
+			StartTime:             t.StartTime,
+			Status:                t.Status,
+			PID:                   t.PID,
 		}
 		globalState.tunnelManager.tunnels[t.ID] = tunnel
 	}

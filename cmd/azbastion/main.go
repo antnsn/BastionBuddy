@@ -23,7 +23,7 @@ func main() {
 				os.Exit(1)
 			}
 			tunnelName := os.Args[2]
-			if err := azure.StartSavedTunnel(tunnelName); err != nil {
+			if _, err := azure.StartSavedTunnel(tunnelName); err != nil {
 				fmt.Printf("Error starting tunnel: %v\n", err)
 				os.Exit(1)
 			}
