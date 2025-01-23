@@ -103,7 +103,7 @@ func initializeTunnelManager() error {
 			ResourceName:   t.ResourceName,
 			SubscriptionID: t.SubscriptionID,
 			StartTime:      t.StartTime,
-			Status:         "restored",
+			Status:         "active", // Mark as active without reconnecting
 		}
 		globalState.tunnelManager.tunnels[t.ID] = tunnel
 	}

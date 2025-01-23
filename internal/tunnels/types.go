@@ -19,6 +19,7 @@ type Config struct {
 	ConnectionType        string    `json:"connection_type"`
 	Username              string    `json:"username"`
 	AuthType              string    `json:"auth_type"`
+	EnableMFA             bool      `json:"enable_mfa,omitempty"`
 }
 
 // SavedConfig represents a saved tunnel configuration
@@ -52,4 +53,5 @@ type Active struct {
 	BastionSubscriptionID string    `json:"bastion_subscription_id"`
 	StartTime             time.Time `json:"start_time"`
 	Status                string    `json:"status"`
+	PID                   int       `json:"pid"`
 }

@@ -90,19 +90,33 @@ func getResourceSelection(ctx context.Context, cred *azidentity.DefaultAzureCred
 	}
 
 	var items []string
-	resourceMap := make(map[string]string)
+	resourceMap := make(map[string]*armresources.GenericResourceExpanded)
 
 	for _, res := range resources {
 		if res.Name == nil || res.ID == nil {
 			continue
 		}
 
-		item := *res.Name
+		// Extract resource group from ID
+		parts := strings.Split(*res.ID, "/")
+		var resourceGroup string
+		for i, part := range parts {
+			if strings.EqualFold(part, "resourceGroups") && i+1 < len(parts) {
+				resourceGroup = parts[i+1]
+				break
+			}
+		}
+
+		// Include name, resource group, and location in the display
+		item := fmt.Sprintf("%s | Group: %s | Region: %s",
+			*res.Name,
+			resourceGroup,
+			*res.Location)
 		items = append(items, item)
-		resourceMap[item] = *res.ID
+		resourceMap[item] = res
 	}
 
-	selected, err := utils.SelectWithMenu(items, "Select target resource")
+	selected, err := utils.SelectWithMenu(items, "Select virtual machine (type to filter)")
 	if err != nil {
 		if strings.Contains(err.Error(), "cancelled by user") {
 			fmt.Println("\nOperation cancelled by user")
@@ -111,10 +125,10 @@ func getResourceSelection(ctx context.Context, cred *azidentity.DefaultAzureCred
 		return nil, fmt.Errorf("failed to select resource: %v", err)
 	}
 
-	resourceID := resourceMap[selected]
+	selectedResource := resourceMap[selected]
 	return &config.TargetResource{
-		ID:   resourceID,
-		Name: selected,
+		ID:   *selectedResource.ID,
+		Name: *selectedResource.Name,
 		Type: "Microsoft.Compute/virtualMachines",
 	}, nil
 }

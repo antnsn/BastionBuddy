@@ -1,7 +1,9 @@
 package azure
 
 import (
+	"bytes"
 	"fmt"
+	"net"
 	"os/exec"
 	"time"
 
@@ -24,6 +26,7 @@ type TunnelInfo struct {
 	StartTime             time.Time
 	Status                string
 	cmd                   *exec.Cmd
+	PID                   int
 }
 
 // TunnelManager manages tunnel connections
@@ -98,10 +101,13 @@ func (tm *TunnelManager) StopAllTunnels() error {
 
 // stopTunnelProcess stops the process associated with a tunnel
 func (tm *TunnelManager) stopTunnelProcess(tunnel *TunnelInfo) error {
+	fmt.Printf("Stopping tunnel process for ID: %s\n", tunnel.ID)
 	if tunnel.cmd != nil && tunnel.cmd.Process != nil {
 		if err := tunnel.cmd.Process.Kill(); err != nil {
+			fmt.Printf("Failed to kill tunnel process for ID %s: %v\n", tunnel.ID, err)
 			return fmt.Errorf("failed to kill tunnel process: %v", err)
 		}
+		fmt.Printf("Successfully killed tunnel process for ID: %s\n", tunnel.ID)
 	}
 	return nil
 }
@@ -125,10 +131,20 @@ func (tm *TunnelManager) StartTunnel(subscriptionID string, resourceID string, r
 
 	// Prepare the Azure command
 	cmd := utils.PrepareAzureCommand("network", "bastion", "tunnel",
-		"--subscription", subscriptionID,
+		"--subscription", bastionSubscriptionID, // Use bastion's subscription ID
 		"--target-resource-id", resourceID,
 		"--resource-port", fmt.Sprintf("%d", remotePort),
-		"--port", fmt.Sprintf("%d", localPort))
+		"--port", fmt.Sprintf("%d", localPort),
+		"--name", bastionName,
+		"--resource-group", bastionResourceGroup)
+
+	// Print command for debugging
+	// fmt.Printf("Starting tunnel with command: %s %v\n", cmd.Path, cmd.Args)
+
+	// Capture output for debugging
+	var outputBuffer bytes.Buffer
+	cmd.Stdout = &outputBuffer
+	cmd.Stderr = &outputBuffer
 
 	cmd.SysProcAttr = utils.GetSysProcAttr()
 	tunnel.cmd = cmd
@@ -138,8 +154,41 @@ func (tm *TunnelManager) StartTunnel(subscriptionID string, resourceID string, r
 		return nil, fmt.Errorf("failed to start tunnel: %v", err)
 	}
 
+	// Store the PID
+	tunnel.PID = cmd.Process.Pid
+
 	// Save the tunnel info
 	tm.tunnels[tunnel.ID] = tunnel
+
+	// Wait a moment and check if the process is still running
+	time.Sleep(2 * time.Second)
+	if cmd.Process == nil || cmd.ProcessState != nil && cmd.ProcessState.Exited() {
+		tunnel.Status = "failed"
+		output := outputBuffer.String()
+		return nil, fmt.Errorf("tunnel process failed to start or exited immediately: %s", output)
+	}
+
+	// Check if the port is actually being listened on
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", localPort), time.Second)
+	if err != nil {
+		tunnel.Status = "failed"
+		output := outputBuffer.String()
+		if err := cmd.Process.Kill(); err != nil {
+			fmt.Printf("Warning: failed to kill tunnel process: %v\n", err)
+		}
+		return nil, fmt.Errorf("tunnel port %d is not listening after startup: %v\nOutput: %s", localPort, err, output)
+	}
+
+	// Close the connection and check for errors
+	if err := conn.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close connection: %v", err)
+	}
+
+	// Update status to running
+	tunnel.Status = "running"
+
+	// Print connection command
+	tm.PrintConnectionCommand(tunnel)
 
 	// Save the tunnel configuration
 	activeTunnel := &tunnels.Active{
@@ -154,6 +203,7 @@ func (tm *TunnelManager) StartTunnel(subscriptionID string, resourceID string, r
 		BastionSubscriptionID: bastionSubscriptionID,
 		StartTime:             time.Now(),
 		Status:                "active",
+		PID:                   tunnel.PID, // Include PID
 	}
 	if err := tm.configMgr.SaveActive(*activeTunnel); err != nil {
 		// Clean up if saving fails
@@ -181,6 +231,16 @@ func (tm *TunnelManager) StartTunnel(subscriptionID string, resourceID string, r
 	}
 
 	return tunnel, nil
+}
+
+// PrintConnectionCommand prints the command to connect to a tunnel
+func (tm *TunnelManager) PrintConnectionCommand(tunnel *TunnelInfo) {
+	// For localhost tunnels, we want to skip host key checking since the key will change
+	// with different local ports
+	fmt.Printf("\nTunnel activated:\n")
+	fmt.Printf("Connection available at: localhost\n")
+	fmt.Printf("Port: %d\n", tunnel.LocalPort)
+	fmt.Printf("\n")
 }
 
 // SaveActive saves an active tunnel configuration

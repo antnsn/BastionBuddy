@@ -156,7 +156,7 @@ func StartSavedRDP(configName string) error {
 	}
 
 	// Get all saved configurations
-	configs := manager.GetSavedConfigs()
+	configs := manager.GetSavedConfigsByType("rdp")
 
 	// Find the requested configuration
 	var savedConfig *tunnels.Config
@@ -168,7 +168,7 @@ func StartSavedRDP(configName string) error {
 	}
 
 	if savedConfig == nil {
-		return fmt.Errorf("configuration '%s' not found", configName)
+		return fmt.Errorf("RDP configuration '%s' not found", configName)
 	}
 
 	// Create resource config from saved config
@@ -187,7 +187,13 @@ func StartSavedRDP(configName string) error {
 		RemotePort: savedConfig.RemotePort,
 	}
 
-	return connectRDP(resourceConfig)
+	// Update the last used time
+	savedConfig.LastUsed = time.Now()
+	if err := manager.configMgr.SaveConfig(*savedConfig); err != nil {
+		return fmt.Errorf("failed to update last used time: %v", err)
+	}
+
+	return connectRDP(resourceConfig, savedConfig)
 }
 
 // ListConfigurations lists saved configurations, optionally filtered by type
